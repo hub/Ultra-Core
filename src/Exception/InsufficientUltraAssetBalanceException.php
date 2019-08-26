@@ -8,6 +8,6 @@ namespace Hub\UltraCore\Exception;
 
 use RuntimeException;
 
-class InsufficientAssetAvailabilityException extends RuntimeException
+class InsufficientUltraAssetBalanceException extends RuntimeException
 {
 }

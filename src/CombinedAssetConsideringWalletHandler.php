@@ -6,10 +6,12 @@
 
 namespace Hub\UltraCore;
 
-use Hub\UltraCore\Model\Eloquent\Wallet;
 use Hub\UltraCore\Exception\InsufficientAssetAvailabilityException;
 use Hub\UltraCore\Exception\InsufficientBalanceException;
+use Hub\UltraCore\Exception\InsufficientUltraAssetBalanceException;
 use Hub\UltraCore\Exception\InsufficientVenBalanceException;
+use Hub\UltraCore\Exception\WalletException;
+use Hub\UltraCore\Wallet\Wallet;
 
 class CombinedAssetConsideringWalletHandler implements WalletHandler
 {
@@ -24,7 +26,7 @@ class CombinedAssetConsideringWalletHandler implements WalletHandler
     private $ultraAssetsRepository;
 
     /**
-     * @param WalletHandler $innerWalletHandler
+     * @param WalletHandler         $innerWalletHandler
      * @param UltraAssetsRepository $ultraAssetsRepository
      */
     public function __construct(
@@ -36,13 +38,15 @@ class CombinedAssetConsideringWalletHandler implements WalletHandler
     }
 
     /**
-     * Purchases a requested amount from the given asset and credits it into the given user's asset wallet.
+     * Use this function to process an ultra buy action.
      *
-     * @param int $userId
+     * @param int        $userId Hub Culture user identifier.
      * @param UltraAsset $asset
-     * @param float $purchaseAssetAmount
+     * @param float      $purchaseAssetAmount
+     *
      * @throws InsufficientVenBalanceException
      * @throws InsufficientAssetAvailabilityException
+     * @throws WalletException
      */
     public function purchase($userId, UltraAsset $asset, $purchaseAssetAmount)
     {
@@ -53,9 +57,14 @@ class CombinedAssetConsideringWalletHandler implements WalletHandler
     }
 
     /**
-     * @param int $userId
-     * @param UltraAsset $asset
-     * @param float $sellAssetAmount
+     * Use this function to process an ultra sell action.
+     *
+     * @param int        $userId          Hub Culture user identifier.
+     * @param UltraAsset $asset           Ultra asset created by a user.
+     * @param float      $sellAssetAmount Amount of assets that the user is about to sell.
+     *
+     * @throws InsufficientUltraAssetBalanceException
+     * @throws WalletException
      */
     public function sell($userId, UltraAsset $asset, $sellAssetAmount)
     {
@@ -63,16 +72,15 @@ class CombinedAssetConsideringWalletHandler implements WalletHandler
     }
 
     /**
-     * Transfer some asset amount to a friend. This will debit the sender's wallet with the equivalent amount.
-     *
      * @param Wallet $senderWallet
-     * @param int $receiverId
-     * @param float $transferAssetAmount
-     * @param string $message [optional]
+     * @param int    $receiverId Hub Culture receiver user identifier.
+     * @param float  $purchaseAssetAmount
+     * @param string $message    [optional]
+     *
      * @throws InsufficientBalanceException
      */
-    public function gift(Wallet $senderWallet, $receiverId, $transferAssetAmount, $message = '')
+    public function gift(Wallet $senderWallet, $receiverId, $purchaseAssetAmount, $message = '')
     {
-        $this->innerWalletHandler->gift($senderWallet, $receiverId, $transferAssetAmount, $message);
+        $this->innerWalletHandler->gift($senderWallet, $receiverId, $purchaseAssetAmount, $message);
     }
 }

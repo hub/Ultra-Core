@@ -23,13 +23,17 @@ class UniqueUltraAssetCollectionTest extends TestCase
                 1,
                 md5(sprintf('[{"type":"%s","amount":%s}]', $asset1Weighting->currencyName(), $asset1Weighting->percentage())),
                 'title1',
+                'category1',
                 'tickerSymbol1',
                 6,
                 'backgroundImage1',
+                'iconImage1',
                 true,
                 true,
                 1,
-                array($asset1Weighting)
+                'weightingType1',
+                array($asset1Weighting),
+                'created_at1'
             )
         );
 
@@ -39,13 +43,17 @@ class UniqueUltraAssetCollectionTest extends TestCase
                 2,
                 md5(sprintf('[{"type":"%s","amount":%s}]', $asset2Weighting->currencyName(), $asset2Weighting->percentage())),
                 'title2',
+                'category2',
                 'tickerSymbol2',
                 4,
                 'backgroundImage2',
+                'iconImage2',
                 true,
                 true,
                 1,
-                array($asset2Weighting)
+                'weightingType2',
+                array($asset2Weighting),
+                'created_at2'
             )
         );
         $sut->addAsset(
@@ -53,13 +61,17 @@ class UniqueUltraAssetCollectionTest extends TestCase
                 3,
                 'weightingHash3',
                 'title3',
+                'category3',
                 'tickerSymbol3',
                 0,
                 'backgroundImage3',
+                'iconImage3',
                 true,
                 true,
                 1,
-                array(new UltraAssetWeighting('currencyName3', 33.123456, 100))
+                'weightingType3',
+                array(new UltraAssetWeighting('currencyName3', 33.123456, 100)),
+                'created_at3'
             )
         );
 
@@ -70,13 +82,17 @@ class UniqueUltraAssetCollectionTest extends TestCase
                     1,
                     $testAsset1->weightingHash(),
                     $asset1Weighting->currencyName(),
+                    'category1',
                     sprintf('u%s', strtoupper($asset1Weighting->currencyName())),
                     10, // 6 + 4 as the asset 1 and asset 2 has similar weighting config. both got 100% 'currencyName1' currency
                     'backgroundImage1',
+                    'iconImage1',
                     true,
                     true,
                     1,
-                    array($asset1Weighting)
+                    'weightingType1',
+                    array($asset1Weighting),
+                    'created_at1'
                 ),
                 $testAsset3->weightingHash() => $testAsset3,
             ),

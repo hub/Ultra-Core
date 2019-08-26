@@ -1,2 +1,7 @@
+# IDEs
+.idea
+nbproject
+
+# Other
 /vendor/
 composer.lock

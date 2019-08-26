@@ -6,14 +6,36 @@
 
 namespace Hub\UltraCore;
 
+use Hub\UltraCore\Money\Currency;
+use Hub\UltraCore\Money\Money;
 use Hub\UltraCore\Exception\InsufficientAssetAvailabilityException;
-use TSK\ResultSetPaginator\PaginationFactory;
+use Exception;
 use mysqli;
 
 class UltraAssetsRepository
 {
     const CURRENCY_CODE_VEN = 'VEN';
-    const DECIMAL_SEPERATOR = '.';
+    const DECIMAL_SEPARATOR = '.';
+    const TYPE_CURRENCY_COMBO = 'currency_combination';
+    const TYPE_VEN_AMOUNT = 'custom_ven_amount';
+    const TYPE_EXTERNAL_ENTITY = 'external_entity_with_description';
+
+    public static $availableWeightingTypes = array(
+        self::TYPE_CURRENCY_COMBO => 'Combining Other Currencies',
+        self::TYPE_VEN_AMOUNT => 'Custom VEN amount per asset',
+        // ask Stan what he really wants as I am not aware of the pricing model for this.
+        self::TYPE_EXTERNAL_ENTITY => 'Relate to external entity with proof attached/described',
+    );
+
+    public static $availableAssetCategories = array(
+        'object' => 'An Object',
+        'art' => 'Art',
+        'fiat' => 'Fiat',
+        'land' => 'Land',
+        'real_estate' => 'Real Estate',
+        'reward' => 'Reward',
+        'car' => 'Vehicle',
+    );
 
     /**
      * @var mysqli
@@ -21,17 +43,17 @@ class UltraAssetsRepository
     private $dbConnection;
 
     /**
-     * @var CurrencyRatesProvider
+     * @var CurrencyRatesProviderInterface
      */
     private $currencyRatesProvider;
 
     /**
      * @param mysqli $dbConnection
-     * @param CurrencyRatesProvider $currencyRatesProvider
+     * @param CurrencyRatesProviderInterface $currencyRatesProvider
      */
     public function __construct(
-        mysqli $dbConnection, 
-        CurrencyRatesProvider $currencyRatesProvider
+        mysqli $dbConnection,
+        CurrencyRatesProviderInterface $currencyRatesProvider
     ) {
         $this->dbConnection = $dbConnection;
         $this->currencyRatesProvider = $currencyRatesProvider;
@@ -47,37 +69,15 @@ class UltraAssetsRepository
 
         $assetCollection = new UniqueUltraAssetCollection();
         if ($stmt->num_rows === 0) {
-            $assetCollection;
+            return $assetCollection;
         }
 
         while ($asset = $stmt->fetch_assoc()) {
+            $asset['num_assets'] = $asset['numAssets'];
             $assetCollection->addAsset($this->getWeightingEnrichedUltraAsset($asset));
         }
 
         return $assetCollection;
-    }
-
-    /**
-     * @return array [AbstractResultSetPaginator, UltraAssetCollection]
-     */
-    public function getAllActiveAssetsWithPagination($page = 1, $limit = 10)
-    {
-        $paginationFactory = new PaginationFactory($this->dbConnection, $page, $limit);
-        $paginator = $paginationFactory->getPaginator();
-
-        /** @var \mysqli_result $stmt */
-        $stmt = $paginator->query($this->getUltraAssetRetrievalQuery());
-
-        $assetCollection = new UniqueUltraAssetCollection();
-        if ($stmt->num_rows === 0) {
-            return array($paginator, $assetCollection);
-        }
-
-        while ($asset = $stmt->fetch_assoc()) {
-            $assetCollection->addAsset($this->getWeightingEnrichedUltraAsset($asset));
-        }
-
-        return array($paginator, $assetCollection);
     }
 
     /**
@@ -96,6 +96,21 @@ class UltraAssetsRepository
     }
 
     /**
+     * @param string $ticker unique ticker symbol of a ultra asset. ex: uBMD
+     * @return UltraAsset|null
+     */
+    public function getAssetByTicker($ticker)
+    {
+        /** @var \mysqli_result $stmt */
+        $stmt = $this->dbConnection->query("SELECT * FROM ultra_assets WHERE ticker_symbol = '{$ticker}'");
+        if ($stmt->num_rows === 0) {
+            return null;
+        }
+
+        return $this->getWeightingEnrichedUltraAsset($stmt->fetch_assoc());
+    }
+
+    /**
      * @param int $assetId
      * @param float $quantity
      */
@@ -105,37 +120,19 @@ class UltraAssetsRepository
     }
 
     /**
+     * Returns the number of assets required for 1 Ven.
+     *
      * @param UltraAsset $asset
-     * @return float
-     */
-    public function getVenAmountForOneAsset(UltraAsset $asset)
-    {
-        $equivalentAssetAmountForOneVen = $this->getAssetValue($asset);
-
-        $oneAssetPriceInVen = 1 / $equivalentAssetAmountForOneVen;
-        $amountParts = explode(self::DECIMAL_SEPERATOR, $oneAssetPriceInVen);
-
-        // absolute precision value WITHOUT doing any round/ceil/floor
-        return floatval(
-            $amountParts[0] . self::DECIMAL_SEPERATOR . substr($amountParts[1], 0, 4)
-        );
-    }
-
-    /**
-     * @param UltraAsset $asset
-     * @return float
+     * @return Money
      */
     public function getAssetAmountForOneVen(UltraAsset $asset)
     {
-        $equivalentAssetAmountForOneVen = $this->getAssetValue($asset);
+        $amount = $this->getAssetValue($asset);
+        if ($asset->weightingType() == 'custom_ven_amount') {
+            $amount = floatval(array_shift($asset->weightings())->currencyAmount());
+        }
 
-        $assetValueForNVen = 1 * $equivalentAssetAmountForOneVen;
-        $amountParts = explode(self::DECIMAL_SEPERATOR, $assetValueForNVen);
-
-        // absolute precision value WITHOUT doing any round/ceil/floor
-        return floatval(
-            $amountParts[0] . self::DECIMAL_SEPERATOR . substr($amountParts[1], 0, 4)
-        );
+        return new Money($amount, Currency::custom($asset->tickerSymbol()));
     }
 
     /**
@@ -143,7 +140,7 @@ class UltraAssetsRepository
      * @param bool $isFormatted
      * @return float
      */
-    public function getAssetValue(UltraAsset $asset, $isFormatted = false)
+    private function getAssetValue(UltraAsset $asset, $isFormatted = false)
     {
         $equivalentAssetAmountForOneVen = 0;
         foreach ($asset->weightings() as $weighting) {
@@ -156,11 +153,11 @@ class UltraAssetsRepository
             return $equivalentAssetAmountForOneVen;
         }
 
-        $amountParts = explode(self::DECIMAL_SEPERATOR, $equivalentAssetAmountForOneVen);
+        $amountParts = explode(self::DECIMAL_SEPARATOR, $equivalentAssetAmountForOneVen);
 
         // absolute precision value WITHOUT doing any round/ceil/floor
         return floatval(
-            $amountParts[0] . self::DECIMAL_SEPERATOR . substr($amountParts[1], 0, 4)
+            $amountParts[0] . self::DECIMAL_SEPARATOR . substr($amountParts[1], 0, 4)
         );
     }
 
@@ -169,18 +166,32 @@ class UltraAssetsRepository
      */
     public function enrichAssetWeightingAmounts(UltraAsset &$asset)
     {
-        $currencies = $this->currencyRatesProvider->getByPrimaryCurrencySymbol(self::CURRENCY_CODE_VEN);
+        if ($asset->weightingType() != 'currency_combination') {
+            return;
+        }
+
+        $currencies = $this->currencyRatesProvider->getByPrimaryCurrencySymbol(Currency::VEN());
 
         $assetWeightings = array();
         foreach ($asset->weightings() as $weighting) {
+            $isWeightingAdded = false;
             foreach ($currencies as $currency) {
-                if ($currency['secondary_currency'] !== $weighting->currencyName()) {
+                if ($currency->getCurrencyName() !== $weighting->currencyName()) {
                     continue;
                 }
 
                 $assetWeightings[] = new UltraAssetWeighting(
-                    $currency['secondary_currency'],
-                    $currency['current_amount'],
+                    $weighting->currencyName(),
+                    $currency->getRatePerOneVen(),
+                    $weighting->percentage()
+                );
+                $isWeightingAdded = true;
+            }
+
+            if (!$isWeightingAdded && strtolower($weighting->currencyName()) == 'ven') {
+                $assetWeightings[] = new UltraAssetWeighting(
+                    'Ven',
+                    1,
                     $weighting->percentage()
                 );
             }
@@ -262,7 +273,60 @@ SQL
         return $quantitiesPerAssets;
     }
 
-    private function getWeightingEnrichedUltraAsset(array $asset)
+    /**
+     * @param int $assetId
+     * @param string $selectedConditionIds list of term ids
+     * @return int
+     */
+    public function addAssetTermRelations($assetId, array $selectedConditionIds)
+    {
+        $insertCount = 0;
+        foreach ($selectedConditionIds as $selectedConditionId) {
+            $termId = intval($selectedConditionId);
+            if ($termId === 0) {
+                continue;
+            }
+
+            $sql = "INSERT IGNORE INTO `ultra_asset_terms` (`asset_id`, `term_id`) VALUES ({$assetId}, {$termId})";
+            $created = $this->dbConnection->query($sql);
+            if (!$created) {
+                throw new Exception($this->dbConnection->error);
+            }
+            $insertCount++;
+        }
+
+        return $insertCount;
+    }
+
+    /**
+     * @param int $assetId
+     * @return bool
+     */
+    public function removeAssetTermRelations($assetId)
+    {
+        return $this->dbConnection->query("DELETE FROM `ultra_asset_terms` WHERE `asset_id` = {$assetId}");
+    }
+
+    /**
+     * @param int $assetId
+     * @return array
+     */
+    public function getAssetTermRelations($assetId)
+    {
+        $stmt = $this->dbConnection->query("SELECT * FROM `ultra_asset_terms` AS pivot INNER JOIN `terms_and_conditions` AS t ON (t.id = pivot.term_id) WHERE pivot.`asset_id` = {$assetId}");
+        if ($stmt->num_rows === 0) {
+            return array();
+        }
+
+        $terms = array();
+        while ($asset = $stmt->fetch_assoc()) {
+            $terms[] = $asset;
+        }
+
+        return $terms;
+    }
+
+    protected function getWeightingEnrichedUltraAsset(array $asset)
     {
         $assetObj = UltraAssetFactory::fromArray($asset);
 
@@ -271,8 +335,31 @@ SQL
         return $assetObj;
     }
 
-    private function getUltraAssetRetrievalQuery()
+    protected function getUltraAssetRetrievalQuery($filters = array())
     {
+        $where = ['1'];
+        foreach ($filters as $filterName => $filterValue) {
+            if (empty($filterValue)) {
+                continue;
+            }
+
+            switch($filterName) {
+                case 'name':
+                    $where[] = "title = '{$filterValue}'";
+                    break;
+                case 'ticker':
+                    $where[] = "ticker_symbol = '{$filterValue}'";
+                    break;
+                case 'quantitygte':
+                    $where[] = "num_assets >= {$filterValue}";
+                    break;
+                case 'category':
+                    $where[] = "category = '{$filterValue}'";
+                    break;
+            }
+        }
+
+        $whereStr = implode(' AND ', $where);
         return <<<SQL
 SELECT
     *,
@@ -282,6 +369,7 @@ FROM `ultra_assets`
 WHERE
     `is_approved` = 1
     AND `num_assets` > 0
+    AND {$whereStr}
 GROUP BY `hash`
 SQL;
     }

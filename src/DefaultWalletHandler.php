@@ -6,17 +6,22 @@
 
 namespace Hub\UltraCore;
 
-use Hub\UltraCore\Repository\VenRepository;
-use Hub\UltraCore\Repository\WalletRepository;
-use Hub\UltraCore\Model\Eloquent\Wallet;
+use Hub\UltraCore\Exception\WalletException;
+use Hub\UltraCore\Money\Currency;
+use Hub\UltraCore\Money\Exchange;
+use Hub\UltraCore\Money\Money;
 use Hub\UltraCore\Exception\InsufficientAssetAvailabilityException;
 use Hub\UltraCore\Exception\InsufficientBalanceException;
+use Hub\UltraCore\Exception\InsufficientUltraAssetBalanceException;
 use Hub\UltraCore\Exception\InsufficientVenBalanceException;
+use Hub\UltraCore\Ven\UltraVenRepository;
+use Hub\UltraCore\Wallet\Wallet;
+use Hub\UltraCore\Wallet\WalletRepository;
 
 class DefaultWalletHandler implements WalletHandler
 {
     /**
-     * @var VenRepository
+     * @var UltraVenRepository
      */
     private $venRepository;
 
@@ -31,40 +36,50 @@ class DefaultWalletHandler implements WalletHandler
     private $walletRepository;
 
     /**
-     * @param VenRepository $venRepository
+     * @var Exchange
+     */
+    private $exchange;
+
+    /**
+     * @param UltraVenRepository    $venRepository
      * @param UltraAssetsRepository $ultraAssetsRepository
-     * @param WalletRepository $walletRepository
+     * @param WalletRepository      $walletRepository
+     * @param Exchange              $exchange
      */
     public function __construct(
-        VenRepository $venRepository,
+        UltraVenRepository $venRepository,
         UltraAssetsRepository $ultraAssetsRepository,
-        WalletRepository $walletRepository
+        WalletRepository $walletRepository,
+        Exchange $exchange
     ) {
         $this->venRepository = $venRepository;
         $this->ultraAssetsRepository = $ultraAssetsRepository;
         $this->walletRepository = $walletRepository;
+        $this->exchange = $exchange;
     }
 
     /**
-     * Purchases a requested amount from the given asset and credits it into the given user's asset wallet.
+     * Use this function to process an ultra buy action.
      *
-     * @param int $userId
+     * @param int        $userId Hub Culture user identifier.
      * @param UltraAsset $asset
-     * @param float $purchaseAssetAmount
+     * @param float      $purchaseAssetAmount
+     *
      * @throws InsufficientVenBalanceException
      * @throws InsufficientAssetAvailabilityException
+     * @throws WalletException
      */
     public function purchase($userId, UltraAsset $asset, $purchaseAssetAmount)
     {
-        $venBalance = $this->venRepository->getVenBalanceOfUser($userId);
-        $venAmountForOneAsset = $this->ultraAssetsRepository->getVenAmountForOneAsset($asset);
+        $venWallet = $this->venRepository->getVenWalletOfUser($userId);
+        $venAmountForOneAsset = $this->exchange->convertToVen(new Money(1, $asset->getCurrency()))->getAmount();
 
         // ven balance validation : do not let them pay ven they don't have in their balance
         $totalVenAmountForAssets = ($venAmountForOneAsset * $purchaseAssetAmount);
-        if ($totalVenAmountForAssets > $venBalance->balance()) {
+        if ($totalVenAmountForAssets > $venWallet->getBalance()) {
             throw new InsufficientVenBalanceException(sprintf(
                 'Current VEN Balance of \'%s\' is not sufficient to buy the assets worth \'%s\' VEN',
-                $venBalance->balance(),
+                $venWallet->getBalance(),
                 $totalVenAmountForAssets
             ));
         }
@@ -87,9 +102,12 @@ class DefaultWalletHandler implements WalletHandler
 
         $metaData = [];
         $metaData['asset_amount_in_ven'] = $totalVenAmountForAssets;
-        $metaData['asset_amount_for_one_ven'] = $this->ultraAssetsRepository->getAssetAmountForOneVen($asset);
+        $metaData['asset_amount_for_one_ven'] = $this->exchange
+            ->convertFromVenToOther(new Money(1, Currency::VEN()), $asset->getCurrency())
+            ->getAmountAsString();
         $metaData['ven_amount_for_one_asset'] = $venAmountForOneAsset;
         $metaData['weightingConfig'] = $weightingConfig;
+        $metaData['commit'] = true;
 
         $wallet = $this->walletRepository->getUserWallet($userId, $asset->id());
 
@@ -104,34 +122,54 @@ class DefaultWalletHandler implements WalletHandler
     }
 
     /**
-     * @todo : integrate erc20 system here to sell ultra assets
-     * @param int $userId
-     * @param UltraAsset $asset
-     * @param float $purchaseAssetAmount
+     * Use this function to process an ultra sell action.
+     *
+     * @param int        $userId          Hub Culture user identifier.
+     * @param UltraAsset $asset           Ultra asset created by a user.
+     * @param float      $sellAssetAmount Amount of assets that the user is about to sell.
+     *
+     * @throws InsufficientUltraAssetBalanceException
+     * @throws WalletException
      */
-    public function sell($userId, UltraAsset $asset, $purchaseAssetAmount)
+    public function sell($userId, UltraAsset $asset, $sellAssetAmount)
     {
+        $wallet = $this->walletRepository->getUserWallet($userId, $asset->id());
+
+        // ven balance validation : do not let them pay ven they don't have in their balance
+        if ($sellAssetAmount > $wallet->getAvailableBalance()) {
+            throw new InsufficientUltraAssetBalanceException(sprintf(
+                'Current asset balance of \'%s\' is not sufficient to sell %s of assets',
+                $wallet->getAvailableBalance(),
+                $sellAssetAmount
+            ));
+        }
+
         $weightingConfig = [];
         array_walk($asset->weightings(), function (UltraAssetWeighting $weighting) use (&$weightingConfig) {
             $weightingConfig[] = $weighting->toArray();
         });
 
         $metaData = [];
+        $venAmountForOneAsset = $this->exchange->convertToVen(new Money(1, $asset->getCurrency()))->getAmount();
+        $metaData['asset_amount_in_ven'] = ($venAmountForOneAsset * $sellAssetAmount);
+        $metaData['asset_amount_for_one_ven'] = $this->exchange
+            ->convertFromVenToOther(new Money(1, Currency::VEN()), $asset->getCurrency())
+            ->getAmountAsString();
+        $metaData['ven_amount_for_one_asset'] = $venAmountForOneAsset;
         $metaData['weightingConfig'] = $weightingConfig;
+        $metaData['commit'] = false; // sell orders are always processed / committed by an admin for now until we integrate Kraken or other exchange.
 
-        $wallet = $this->walletRepository->getUserWallet($userId, $asset->id());
-        $this->walletRepository->debit($wallet, $purchaseAssetAmount, $metaData);
+        $this->walletRepository->debit($wallet, $sellAssetAmount, $metaData);
 
-        // @TODO: calculate VEN. TBD
+        // TODO: implement kraken exchange functions to process the transaction immediately
     }
 
     /**
-     * Transfer some asset amount to a friend. This will debit the sender's wallet with the equivalent amount.
-     *
      * @param Wallet $senderWallet
-     * @param int $receiverId
-     * @param float $transferAssetAmount
+     * @param int    $receiverId
+     * @param float  $purchaseAssetAmount
      * @param string $message [optional]
+     *
      * @throws InsufficientBalanceException
      */
     public function gift(Wallet $senderWallet, $receiverId, $purchaseAssetAmount, $message = '')
@@ -155,13 +193,16 @@ class DefaultWalletHandler implements WalletHandler
             $weightingConfig[] = $weighting->toArray();
         });
 
-        $venAmountForOneAsset = $this->ultraAssetsRepository->getVenAmountForOneAsset($asset);
+        $venAmountForOneAsset = $this->exchange->convertToVen(new Money(1, $asset->getCurrency()))->getAmount();
         $metaData['asset_amount_in_ven'] = ($venAmountForOneAsset * $purchaseAssetAmount);
-        $metaData['asset_amount_for_one_ven'] = $this->ultraAssetsRepository->getAssetAmountForOneVen($asset);
+        $metaData['asset_amount_for_one_ven'] = $this->exchange
+            ->convertFromVenToOther(new Money(1, Currency::VEN()), $asset->getCurrency())
+            ->getAmountAsString();
         $metaData['ven_amount_for_one_asset'] = $venAmountForOneAsset;
         $metaData['weightingConfig'] = $weightingConfig;
         $metaData['is_transfer'] = 1; // this is to mark this as a fund transfer
         $metaData['transfer_message'] = $message;
+        $metaData['commit'] = true;
 
         $metaData['transfer_related_user'] = $senderWallet->getUserId();
         $this->walletRepository->credit($receiverWallet, $purchaseAssetAmount, $metaData);

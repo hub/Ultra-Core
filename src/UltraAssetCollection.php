@@ -1,7 +1,7 @@
 <?php
 /**
- * @author : Tharanga Kothalawala <tharanga.kothalawala@tsk-webdevelopment.com>
- * @date   : 27/06/2018
+ * @author        Tharanga Kothalawala <tharanga.kothalawala@hubculture.com>
+ * @copyright (c) 2019 by HubCulture Ltd.
  */
 
 namespace Hub\UltraCore;

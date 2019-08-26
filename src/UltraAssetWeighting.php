@@ -12,6 +12,13 @@ class UltraAssetWeighting
     private $currencyAmount;
     private $percentage;
 
+    /**
+     * UltraAssetWeighting constructor.
+     *
+     * @param string $currencyName   The currency type. Ex: USD, GBP
+     * @param string $currencyAmount The currency amount in VEN.
+     * @param int    $percentage     Percentage of the current current type.
+     */
     public function __construct($currencyName, $currencyAmount, $percentage)
     {
         $this->currencyName = $currencyName;
@@ -63,7 +70,7 @@ class UltraAssetWeighting
         ];
 
         if ($isVerbose) {
-            $stats['verbose_calc_percentage_amount'] = "({$this->currencyAmount()} / 100) * {$this->percentage()}%";
+            $stats['verbose_calc_percentage_amount'] = "{$this->currencyAmount()}({$this->currencyName()}) * 0.{$this->percentage()}";
             $stats['verbose_currency_amount'] = $this->currencyAmount();
             $stats['verbose_percentage_amount'] = number_format($percentageAmount, 10, '.', '');
         }
@@ -78,6 +85,11 @@ class UltraAssetWeighting
 
     /**
      * returns an absolute precision value WITHOUT doing any round/ceil/floor
+     *
+     * @param string $amount    The amount in string notation
+     * @param int    $precision the precision to maintain
+     *
+     * @return string
      */
     private function absoluteRoundUpToDecimalPlaces($amount, $precision = 4)
     {

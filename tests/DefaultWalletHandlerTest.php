@@ -6,6 +6,13 @@
 
 namespace Hub\UltraCore;
 
+use Hub\UltraCore\Money\Currency;
+use Hub\UltraCore\Money\Exchange;
+use Hub\UltraCore\Money\Money;
+use Hub\UltraCore\Ven\UltraVenRepository;
+use Hub\UltraCore\Ven\VenWallet;
+use Hub\UltraCore\Wallet\Wallet;
+use Hub\UltraCore\Wallet\WalletRepository;
 use PHPUnit\Framework\TestCase;
 use Mockery;
 
@@ -43,10 +50,10 @@ class DefaultWalletHandlerTest extends TestCase
         });
 
         // VenRepository
-        $balanceMock = Mockery::mock('\Hub\UltraCore\Model\Eloquent\Venbalance');
-        $balanceMock->shouldReceive('balance')->once()->andReturn($testAssetBuyerUserVenBalance);
-        $venRepoMock = Mockery::mock('\Hub\UltraCore\Repository\VenRepository');
-        $venRepoMock->shouldReceive('getVenBalanceOfUser')->once()->andReturn($balanceMock);
+        $balanceMock = Mockery::mock(VenWallet::class);
+        $balanceMock->shouldReceive('getBalance')->once()->andReturn($testAssetBuyerUserVenBalance);
+        $venRepoMock = Mockery::mock(UltraVenRepository::class);
+        $venRepoMock->shouldReceive('getVenWalletOfUser')->once()->andReturn($balanceMock);
         $venRepoMock->shouldReceive('sendVen')->once()->with(
             $testAssetBuyerUserId,
             $testAssetIssuerUserId,
@@ -55,24 +62,31 @@ class DefaultWalletHandlerTest extends TestCase
         );
 
         // UltraAssetsRepository
-        $assetMock = Mockery::mock('\Hub\UltraCore\UltraAsset');
+        $assetMock = Mockery::mock(UltraAsset::class);
         $assetMock->shouldReceive('id')->once()->andReturn($testAssetId);
         $assetMock->shouldReceive('title')->once()->andReturn($testAssetTitle);
         $assetMock->shouldReceive('authorityUserId')->once()->andReturn($testAssetIssuerUserId);
         $assetMock->shouldReceive('numAssets')->twice()->andReturn($testAvailableAssetBalance );
+        $assetMock->shouldReceive('getCurrency')->once()->andReturn(Currency::VEN());
         $assetMock->shouldReceive('weightings')->once()->andReturn($testWeightings);
-        $assetRepoMock = Mockery::mock('\Hub\UltraCore\UltraAssetsRepository');
-        $assetRepoMock->shouldReceive('getVenAmountForOneAsset')->once()->with($assetMock)->andReturn($testVenAmountForOneAsset);
-        $assetRepoMock->shouldReceive('getAssetAmountForOneVen')->once()->andReturn(0.1); // ASSET AMOUNT
+        $assetMock->shouldReceive('tickerSymbol')->once()->andReturn('uTICK');
+
+        // Exchange
+        $exchangeMock = Mockery::mock(Exchange::class);
+        $exchangeMock->shouldReceive('convertToVen')->andReturn(new Money($testVenAmountForOneAsset, Currency::VEN()));
+        $exchangeMock->shouldReceive('convertFromVenToOther')
+            ->andReturn(new Money(0.1, Currency::custom('uTICK'))); // ASSET AMOUNT
+
+        $assetRepoMock = Mockery::mock(UltraAssetsRepository::class);
         $assetRepoMock->shouldReceive('getAssetWeightings')->once()->andReturn($testWeightings);
         $assetRepoMock->shouldReceive('deductAssetQuantityBy')->once()->with($testAssetId, $testPurchaseAssetAmount);
 
         // WalletRepository
-        $walletMock = Mockery::namedMock('\Hub\UltraCore\Model\Eloquent\Wallet');
+        $walletMock = Mockery::namedMock(Wallet::class);
         $walletMock->shouldReceive('getBalance')->once()->andReturn(1);
         $walletMock->shouldReceive('getId')->once()->andReturn(1);
         //$walletMock->shouldReceive('save')->withNoArgs()->once();
-        $walletRepoMock = Mockery::mock('\Hub\UltraCore\Repository\WalletRepository');
+        $walletRepoMock = Mockery::mock(WalletRepository::class);
         $walletRepoMock->shouldReceive('getUserWallet')->once()->andReturn($walletMock);
         $walletRepoMock->shouldReceive('credit')->once()->with(
             $walletMock,
@@ -81,11 +95,12 @@ class DefaultWalletHandlerTest extends TestCase
                 'asset_amount_in_ven' => $testVenAmountForOneAsset * $testPurchaseAssetAmount,
                 'asset_amount_for_one_ven' => 0.1, // ASSET AMOUNT
                 'ven_amount_for_one_asset' => $testVenAmountForOneAsset,
-                'weightingConfig' => $weightingConfig
+                'weightingConfig' => $weightingConfig,
+                'commit' => true,
             )
         );
 
-        $sut = new DefaultWalletHandler($venRepoMock, $assetRepoMock, $walletRepoMock);
+        $sut = new DefaultWalletHandler($venRepoMock, $assetRepoMock, $walletRepoMock, $exchangeMock);
         $sut->purchase($testAssetBuyerUserId, $assetMock, $testPurchaseAssetAmount);
     }
 
@@ -102,21 +117,26 @@ class DefaultWalletHandlerTest extends TestCase
         $testPurchaseAssetAmount = 1;
 
         // VenRepository
-        $balanceMock = Mockery::mock('\Hub\UltraCore\Model\Eloquent\Venbalance');
-        $balanceMock->shouldReceive('balance')->twice()->andReturn($currentUserVenBalance);
-        $venRepoMock = Mockery::mock('\Hub\UltraCore\Repository\VenRepository');
-        $venRepoMock->shouldReceive('getVenBalanceOfUser')->once()->andReturn($balanceMock);
+        $balanceMock = Mockery::mock('\Hub\HubCulture\Model\Eloquent\Venbalance');
+        $balanceMock->shouldReceive('getBalance')->twice()->andReturn($currentUserVenBalance);
+        $venRepoMock = Mockery::mock(UltraVenRepository::class);
+        $venRepoMock->shouldReceive('getVenWalletOfUser')->once()->andReturn($balanceMock);
 
         // UltraAssetsRepository
         $assetMock = Mockery::mock('\Hub\UltraCore\UltraAsset');
         $assetMock->shouldReceive('numAssets')->once();
+        $assetMock->shouldReceive('getCurrency')->once()->andReturn(Currency::VEN());
         $assetRepoMock = Mockery::mock('\Hub\UltraCore\UltraAssetsRepository');
-        $assetRepoMock->shouldReceive('getVenAmountForOneAsset')->once()->with($assetMock)->andReturn($oneAssetInVen);
+
+        // Exchange
+        $exchangeMock = Mockery::mock(Exchange::class);
+        $exchangeMock->shouldReceive('convertToVen')->andReturn(new Money($oneAssetInVen, Currency::VEN()));
+        $exchangeMock->shouldReceive('convertFromVenToOther')->andReturn(new Money(0.1, Currency::custom('uTICK')));
 
         // WalletRepository
-        $walletRepoMock = Mockery::mock('\Hub\UltraCore\Repository\WalletRepository');
+        $walletRepoMock = Mockery::mock(WalletRepository::class);
 
-        $sut = new DefaultWalletHandler($venRepoMock, $assetRepoMock, $walletRepoMock);
+        $sut = new DefaultWalletHandler($venRepoMock, $assetRepoMock, $walletRepoMock, $exchangeMock);
         $sut->purchase($testUserId, $assetMock, $testPurchaseAssetAmount);
     }
 
@@ -134,21 +154,26 @@ class DefaultWalletHandlerTest extends TestCase
         $currentUserVenBalance = 96; // 12 * 8 = 96 VEN
 
         // VenRepository
-        $balanceMock = Mockery::mock('\Hub\UltraCore\Model\Eloquent\Venbalance');
-        $balanceMock->shouldReceive('balance')->twice()->andReturn($currentUserVenBalance);
-        $venRepoMock = Mockery::mock('\Hub\UltraCore\Repository\VenRepository');
-        $venRepoMock->shouldReceive('getVenBalanceOfUser')->once()->andReturn($balanceMock);
+        $balanceMock = Mockery::mock('\Hub\HubCulture\Model\Eloquent\Venbalance');
+        $balanceMock->shouldReceive('getBalance')->twice()->andReturn($currentUserVenBalance);
+        $venRepoMock = Mockery::mock(UltraVenRepository::class);
+        $venRepoMock->shouldReceive('getVenWalletOfUser')->once()->andReturn($balanceMock);
 
         // UltraAssetsRepository
         $assetMock = Mockery::mock('\Hub\UltraCore\UltraAsset');
         $assetMock->shouldReceive('numAssets')->once()->andReturn($totalAvailableAssetAmount);
+        $assetMock->shouldReceive('getCurrency')->once()->andReturn(Currency::VEN());
         $assetRepoMock = Mockery::mock('\Hub\UltraCore\UltraAssetsRepository');
         $assetRepoMock->shouldReceive('getVenAmountForOneAsset')->once()->with($assetMock)->andReturn($oneAssetInVen);
 
-        // WalletRepository
-        $walletRepoMock = Mockery::mock('\Hub\UltraCore\Repository\WalletRepository');
+        // Exchange
+        $exchangeMock = Mockery::mock(Exchange::class);
+        $exchangeMock->shouldReceive('convertToVen')->andReturn(new Money($oneAssetInVen, Currency::VEN()));
 
-        $sut = new DefaultWalletHandler($venRepoMock, $assetRepoMock, $walletRepoMock);
+        // WalletRepository
+        $walletRepoMock = Mockery::mock(WalletRepository::class);
+
+        $sut = new DefaultWalletHandler($venRepoMock, $assetRepoMock, $walletRepoMock, $exchangeMock);
         $sut->purchase($testUserId, $assetMock, $testAssetBuyAmount);
     }
 }

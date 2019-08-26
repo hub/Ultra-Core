@@ -6,6 +6,8 @@
 
 namespace Hub\UltraCore;
 
+use Hub\UltraCore\Money\Currency;
+
 class UltraAsset
 {
     /** @var bool */
@@ -29,6 +31,9 @@ class UltraAsset
     /** @var string */
     private $backgroundImage;
 
+    /** @var string */
+    private $iconImage;
+
     /** @var bool */
     private $isApproved = false;
 
@@ -38,34 +43,48 @@ class UltraAsset
     /** @var int */
     private $authorityUserId;
 
+    /** @var string */
+    private $weightingType;
+
     /** @var UltraAssetWeighting[] */
     private $weightings;
+
+    /** @var string */
+    private $submissionDate;
 
     /**
      * UltraAsset constructor.
      * @param int $id
      * @param string $weightingHash
      * @param string $title
+     * @param string $category
      * @param string $tickerSymbol
      * @param float $numAssets
      * @param string $backgroundImage
+     * @param string $iconImage
      * @param bool $isApproved
      * @param bool $isFeatured
      * @param int $authorityUserId
-     * @param array $weightings
+     * @param string $weightingType
+     * @param UltraAssetWeighting[] $weightings
+     * @param string $submissionDate
      */
-    public function __construct($id, $weightingHash, $title, $tickerSymbol, $numAssets, $backgroundImage, $isApproved, $isFeatured, $authorityUserId, array $weightings)
+    public function __construct($id, $weightingHash, $title, $category, $tickerSymbol, $numAssets, $backgroundImage, $iconImage, $isApproved, $isFeatured, $authorityUserId, $weightingType, array $weightings, $submissionDate)
     {
         $this->id = $id;
         $this->weightingHash = $weightingHash;
         $this->setTitle($title);
+        $this->category = $category;
         $this->setTickerSymbol($tickerSymbol);
         $this->incrementAssetsQuantity(floatval($numAssets));
         $this->backgroundImage = $backgroundImage;
+        $this->iconImage = $iconImage;
         $this->isApproved = boolval($isApproved);
         $this->isFeatured = boolval($isFeatured);
         $this->authorityUserId = intval($authorityUserId);
+        $this->weightingType = $weightingType;
         $this->weightings = $weightings;
+        $this->submissionDate = $submissionDate;
     }
 
     /**
@@ -100,6 +119,14 @@ class UltraAsset
     /**
      * @return string
      */
+    public function uniqueHash()
+    {
+        return md5(sprintf('%s:%s', $this->id, $this->weightingHash));
+    }
+
+    /**
+     * @return string
+     */
     public function title()
     {
         return $this->title;
@@ -111,6 +138,14 @@ class UltraAsset
     public function setTitle($title)
     {
         $this->title = $title;
+    }
+
+    /**
+     * @return string
+     */
+    public function category()
+    {
+        return $this->category;
     }
 
     /**
@@ -154,6 +189,14 @@ class UltraAsset
     }
 
     /**
+     * @return string
+     */
+    public function iconImage()
+    {
+        return empty($this->iconImage) ? '/i/default-ultra-asset-icon.png' : $this->iconImage;
+    }
+
+    /**
      * @return bool
      */
     public function isApproved()
@@ -178,11 +221,27 @@ class UltraAsset
     }
 
     /**
+     * @return string
+     */
+    public function weightingType()
+    {
+        return $this->weightingType;
+    }
+
+    /**
      * @return UltraAssetWeighting[]
      */
     public function weightings()
     {
         return $this->weightings;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isPlotableInChart()
+    {
+        return in_array($this->weightingType(), array('currency_combination', 'custom_ven_amount'));
     }
 
     /**
@@ -196,6 +255,14 @@ class UltraAsset
         }
 
         return json_encode($weightings);
+    }
+
+    /**
+     * @return string
+     */
+    public function submissionDate($format = 'Y-m-d H:i:s')
+    {
+        return date($format, strtotime($this->submissionDate));
     }
 
     /**
@@ -237,15 +304,27 @@ class UltraAsset
         return array(
             'id' => $this->id(),
             'weightingHash' => $this->weightingHash(),
+            'unique_hash' => $this->uniqueHash(),
             'title' => $this->title(),
+            'category' => $this->category(),
             'tickerSymbol' => $this->tickerSymbol(),
             'numAssets' => $this->numAssets(),
             'backgroundImage' => $this->backgroundImage(),
+            'iconImage' => $this->iconImage(),
             'isApproved' => $this->isApproved(),
             'isFeatured' => $this->isFeatured(),
             'authorityUserId' => $this->authorityUserId(),
             'weightings' => $this->weightings(),
+            'submissionDate' => $this->submissionDate(),
         );
+    }
+
+    /**
+     * @return Currency
+     */
+    public function getCurrency()
+    {
+        return Currency::custom($this->tickerSymbol());
     }
 
     /**

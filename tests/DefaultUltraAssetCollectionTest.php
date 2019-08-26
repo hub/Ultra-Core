@@ -21,13 +21,17 @@ class DefaultUltraAssetCollectionTest extends TestCase
                 1,
                 'weightingHash',
                 'title',
+                'category',
                 'tickerSymbol',
                 'numAssets',
                 'backgroundImage',
+                'iconImage',
                 'isApproved',
                 'isFeatured',
                 'authorityUserId',
-                array(new UltraAssetWeighting('currencyName2', 22.123456, 20))
+                'weightingType',
+                array(new UltraAssetWeighting('currencyName2', 22.123456, 20)),
+                '2000-01-01 00:00:00'
             )
         );
 

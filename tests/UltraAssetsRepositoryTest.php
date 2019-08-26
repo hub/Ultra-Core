@@ -49,11 +49,15 @@ class UltraAssetsRepositoryTest extends TestCase
         ];
 
         $assetMock = Mockery::mock('\Hub\UltraCore\UltraAsset');
+        $assetMock->shouldReceive('weightingType')->once();
         $assetMock->shouldReceive('weightings')->once()->andReturn($testWeightingsConfig);
         $expectedWeightings = [
-            new UltraAssetWeighting($testWeightingsConfig[0]->currencyName(), $this->testCurrencies[2]['current_amount'], 37),
-            new UltraAssetWeighting($testWeightingsConfig[1]->currencyName(), $this->testCurrencies[1]['current_amount'], 13),
-            new UltraAssetWeighting($testWeightingsConfig[2]->currencyName(), $this->testCurrencies[0]['current_amount'], 50),
+            new UltraAssetWeighting($testWeightingsConfig[0]->currencyName(),
+                $this->testCurrencies[2]['current_amount'], 37),
+            new UltraAssetWeighting($testWeightingsConfig[1]->currencyName(),
+                $this->testCurrencies[1]['current_amount'], 13),
+            new UltraAssetWeighting($testWeightingsConfig[2]->currencyName(),
+                $this->testCurrencies[0]['current_amount'], 50),
         ];
         $assetMock->shouldReceive('setWeightings')->once()->with($expectedWeightings);
 
@@ -72,6 +76,7 @@ class UltraAssetsRepositoryTest extends TestCase
         ];
 
         $assetMock = Mockery::mock('\Hub\UltraCore\UltraAsset');
+        $assetMock->shouldReceive('weightingType')->once();
         $assetMock->shouldReceive('weightings')->once()->andReturn($testWeightingsConfig);
         $expectedWeightings = []; // since we have requested weightings with wrong / non existing currency types, this is empty
 
@@ -91,28 +96,21 @@ class UltraAssetsRepositoryTest extends TestCase
         ];
 
         $assetMock = Mockery::mock('\Hub\UltraCore\UltraAsset');
+        $assetMock->shouldReceive('weightingType')->once();
+        $assetMock->shouldReceive('tickerSymbol')->once();
         $assetMock->shouldReceive('weightings')->once()->andReturn($testWeightingsConfig);
 
-        /*
-        // $expectedAssetValueInVen = // 21.378
-            1 VEN / (
-                  ((0.1262628972 / 100) * 37)
-                + ((0.0001658963 / 100) * 13)
-                + ((0.0000762543 / 100) * 50)
-            )
-        */
-        $expectedAssetValueInVen = // 21.378
-            1 / (
-                  (($this->testCurrencies[2]['current_amount'] /* 0.1262628972 */ / 100) * 37)
+        $expectedAssetValueInVen = // 0.046776965633000003
+            (
+                (($this->testCurrencies[2]['current_amount'] /* 0.1262628972 */ / 100) * 37)
                 + (($this->testCurrencies[1]['current_amount'] /* 0.0001658963 */ / 100) * 13)
                 + (($this->testCurrencies[0]['current_amount'] /* 0.0000762543 */ / 100) * 50)
             );
-        $expectedAssetValueInVen = floatval(substr($expectedAssetValueInVen, 0, 6)); // value is: 21.378043369587967 (1 / 0.046776965633)
 
-        // The test asset must be worth 21.3780 VEN
-        $actualAssetValue = $this->sut->getVenAmountForOneAsset($assetMock);
-        $this->assertSame($expectedAssetValueInVen, $actualAssetValue);
-        $this->assertTrue((21.3780 === $actualAssetValue));
+        // The test asset must be worth 0.0467 VEN
+        $actualAssetValue = $this->sut->getAssetAmountForOneVen($assetMock);
+        $this->assertSame($expectedAssetValueInVen, $actualAssetValue->getAmount());
+        $this->assertTrue((0.046776965633 === $actualAssetValue->getAmount()));
     }
 
     /**
@@ -125,25 +123,33 @@ class UltraAssetsRepositoryTest extends TestCase
             'id' => 1,
             'hash' => 'similarWeightingHash',
             'title' => 'title1',
+            'category' => 'category1',
             'ticker_symbol' => 'tickerSymbol1',
             'num_assets' => 8,
             'background_image' => 'backgroundImage1',
+            'icon_image' => 'iconImage1',
             'is_approved' => 1,
             'is_featured' => 1,
             'user_id' => 14795,
+            'weighting_type' => 'weightingType',
             'weightings' => '[{"type":"currencyName","amount":100}]',
+            'created_at' => '2000-01-01 00:00:00',
         );
         $ultraAsset2Data = array(
             'id' => 1,
             'hash' => $ultraAsset1Data['hash'],
             'title' => 'title2',
+            'category' => 'category2',
             'ticker_symbol' => 'tickerSymbol2',
             'num_assets' => 8,
             'background_image' => 'backgroundImage2',
+            'icon_image' => 'iconImage2',
             'is_approved' => 1,
             'is_featured' => 1,
             'user_id' => 15795,
+            'weighting_type' => 'weightingType',
             'weightings' => $ultraAsset1Data['weightings'],
+            'created_at' => $ultraAsset1Data['created_at'],
         );
 
         $resultMock = Mockery::mock('\mysqli_result');
@@ -157,13 +163,17 @@ class UltraAssetsRepositoryTest extends TestCase
                 $ultraAsset1Data['id'],
                 $ultraAsset1Data['hash'],
                 $ultraAsset1Data['title'],
+                $ultraAsset1Data['category'],
                 $ultraAsset1Data['ticker_symbol'],
                 $ultraAsset1Data['num_assets'],
                 $ultraAsset1Data['background_image'],
+                $ultraAsset1Data['icon_image'],
                 $ultraAsset1Data['is_approved'],
                 $ultraAsset1Data['is_featured'],
                 $ultraAsset1Data['user_id'],
-                array(new UltraAssetWeighting('currencyName', 0, 100))
+                $ultraAsset1Data['weighting_type'],
+                array(new UltraAssetWeighting('currencyName', 0, 100)),
+                $ultraAsset1Data['created_at']
             ),
             $requiredQuantity
         );
@@ -172,22 +182,26 @@ class UltraAssetsRepositoryTest extends TestCase
             [
                 [
                     'asset' => $testAsset1,
-                    'quantity' => 8.0
+                    'quantity' => 8.0,
                 ],
                 [
                     'asset' => new UltraAsset(
                         $ultraAsset2Data['id'],
                         $ultraAsset2Data['hash'],
                         $ultraAsset2Data['title'],
+                        $ultraAsset2Data['category'],
                         $ultraAsset2Data['ticker_symbol'],
                         $ultraAsset2Data['num_assets'],
                         $ultraAsset2Data['background_image'],
+                        $ultraAsset2Data['icon_image'],
                         $ultraAsset2Data['is_approved'],
                         $ultraAsset2Data['is_featured'],
                         $ultraAsset2Data['user_id'],
-                        array(new UltraAssetWeighting('currencyName', 0, 100))
+                        $ultraAsset2Data['weighting_type'],
+                        array(new UltraAssetWeighting('currencyName', 0, 100)),
+                        $ultraAsset2Data['created_at']
                     ),
-                    'quantity' => 2.0
+                    'quantity' => 2.0,
                 ],
             ],
             $actualQuantitiesPerSimilarAssets
@@ -197,7 +211,8 @@ class UltraAssetsRepositoryTest extends TestCase
     /**
      * @test
      * @expectedException \Hub\UltraCore\Exception\InsufficientAssetAvailabilityException
-     * @expectedExceptionMessage There are no such amount of assets available for your requested amount of 10. Only 9 available.
+     * @expectedExceptionMessage There are no such amount of assets available for your requested amount of 10. Only 9
+     *                           available.
      */
     public function shouldThrowExceptionWhenNoSimilarAssetsAvailableForRequiredQuantity()
     {
@@ -206,25 +221,33 @@ class UltraAssetsRepositoryTest extends TestCase
             'id' => 1,
             'hash' => 'similarWeightingHash',
             'title' => 'title1',
+            'category' => 'category1',
             'ticker_symbol' => 'tickerSymbol1',
             'num_assets' => 8, // EIGHT HERE
             'background_image' => 'backgroundImage1',
+            'icon_image' => 'iconImage1',
             'is_approved' => 1,
             'is_featured' => 1,
             'user_id' => 14795,
+            'weighting_type' => 'weightingType',
             'weightings' => '[{"type":"currencyName","amount":100}]',
+            'created_at' => '2019-01-01',
         );
         $ultraAsset2Data = array(
             'id' => 1,
             'hash' => $ultraAsset1Data['hash'],
             'title' => 'title2',
+            'category' => 'category2',
             'ticker_symbol' => 'tickerSymbol2',
             'num_assets' => 1, // ONE HERE
             'background_image' => 'backgroundImage2',
+            'icon_image' => 'iconImage2',
             'is_approved' => 1,
             'is_featured' => 1,
             'user_id' => 15795,
+            'weighting_type' => 'weightingType',
             'weightings' => $ultraAsset1Data['weightings'],
+            'created_at' => $ultraAsset1Data['created_at'],
         );
 
         $resultMock = Mockery::mock('\mysqli_result');
@@ -238,13 +261,17 @@ class UltraAssetsRepositoryTest extends TestCase
                 $ultraAsset1Data['id'],
                 $ultraAsset1Data['hash'],
                 $ultraAsset1Data['title'],
+                $ultraAsset1Data['category'],
                 $ultraAsset1Data['ticker_symbol'],
                 $ultraAsset1Data['num_assets'],
                 $ultraAsset1Data['background_image'],
+                $ultraAsset1Data['icon_image'],
                 $ultraAsset1Data['is_approved'],
                 $ultraAsset1Data['is_featured'],
                 $ultraAsset1Data['user_id'],
-                array(new UltraAssetWeighting('currencyName', 0, 100))
+                $ultraAsset1Data['weighting_type'],
+                array(new UltraAssetWeighting('currencyName', 0, 100)),
+                $ultraAsset1Data['created_at']
             ),
             $requiredQuantity
         );
