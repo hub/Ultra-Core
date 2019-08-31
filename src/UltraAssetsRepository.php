@@ -129,7 +129,8 @@ class UltraAssetsRepository
     {
         $amount = $this->getAssetValue($asset);
         if ($asset->weightingType() == 'custom_ven_amount') {
-            $amount = floatval(array_shift($asset->weightings())->currencyAmount());
+            $weightings = $asset->weightings();
+            $amount = floatval(array_shift($weightings)->currencyAmount());
         }
 
         return new Money($amount, Currency::custom($asset->tickerSymbol()));

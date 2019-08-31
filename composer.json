@@ -28,6 +28,9 @@
             "Hub\\UltraCore\\": "tests/"
         }
     },
+    "suggest": {
+        "jenssegers/mongodb": "Allows querying a MongoDb to get the currency rates. (MongoBasedCurrencyRatesProvider)"
+    },
     "extra": {
         "branch-alias": {
             "dev-master": "1.x-dev"

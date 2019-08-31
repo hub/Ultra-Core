@@ -105,7 +105,7 @@ class UltraAsset
      */
     public function id()
     {
-        return $this->id;
+        return intval($this->id);
     }
 
     /**
