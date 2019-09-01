@@ -21,8 +21,8 @@ class Money
     /**
      * Money constructor.
      *
-     * @param float    $amount   amount of money
-     * @param Currency $currency the currency of the money
+     * @param float    $amount   Amount of money
+     * @param Currency $currency The currency of the money
      */
     public function __construct($amount, Currency $currency)
     {
@@ -67,7 +67,7 @@ class Money
      */
     public function multiplyBy($multiplier)
     {
-        return new Money($this->getAmount() * $multiplier, $this->getCurrency());
+        return new self($this->getAmount() * $multiplier, $this->getCurrency());
     }
 
     /**
@@ -79,7 +79,7 @@ class Money
      */
     public function divideBy($divisionValue)
     {
-        return new Money($this->getAmount() / $divisionValue, $this->getCurrency());
+        return new self($this->getAmount() / $divisionValue, $this->getCurrency());
     }
 
     /**

@@ -15,7 +15,7 @@ use Hub\UltraCore\CurrencyRatesProviderInterface;
  * - Ultra to Ven
  * - Ultra to Ultra
  *
- * Ultra is the name that we give for currencies/assets that we have created using one or multiple solid assets.
+ * Ultra is the name that we give for currencies/assets that we have created using one or more base fiat currencies.
  *
  * @package Hub\UltraCore\Money
  */

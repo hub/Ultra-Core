@@ -21,7 +21,9 @@ class CurrencyRate
     /**
      * CurrencyRate constructor.
      *
-     * @param string $currencyName  Name of the secondary currency.
+     * @param string $currencyName  Ticker name of the secondary currency.
+     *                              Secondary means always with respect to 1 Ven.
+     *                              ex: USD, uUSD, GBP
      * @param float  $ratePerOneVen Currency amount per one Ven.
      */
     public function __construct($currencyName, $ratePerOneVen)

@@ -22,7 +22,8 @@ class Currency
      * Currency constructor.
      *
      * @param int    $percentFactor
-     * @param string $stringRepresentation
+     * @param string $stringRepresentation Currency short label.
+     *                                     ex: GBP, USD
      */
     private function __construct($percentFactor, $stringRepresentation)
     {

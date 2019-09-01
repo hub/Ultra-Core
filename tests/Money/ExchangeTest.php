@@ -7,11 +7,15 @@
 namespace Hub\UltraCore\Money;
 
 use Hub\UltraCore\CurrencyRatesProvider;
+use Hub\UltraCore\Exchange\VenBaseFiatMoneyRateRepository;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
 class ExchangeTest extends TestCase
 {
+    const USD_FOR_ONE_VEN = 0.0986845216;
+    const ULTRA_FOR_ONE_VEN = 0.00003705595;
+
     /**
      * @var Exchange
      */
@@ -22,10 +26,11 @@ class ExchangeTest extends TestCase
         /**
          * @var array currency exchange rates taken by the ven api as of today (2019-08-18).
          * @see http://apilaravel.ven.vc/api/ven/exchange
+         * @see VenBaseFiatMoneyRateRepository
          */
         $testCurrencies = [
-            new CurrencyRate('USD', 0.0986845216),
-            new CurrencyRate('uXAB', 0.00003705595),
+            new CurrencyRate('USD', self::USD_FOR_ONE_VEN),
+            new CurrencyRate('uXAB', self::ULTRA_FOR_ONE_VEN),
         ];
 
         $currencyRatesProviderMock = Mockery::mock(CurrencyRatesProvider::class);
@@ -68,15 +73,40 @@ class ExchangeTest extends TestCase
     }
 
     /**
-     * Let's get the amount in USD for 50 VEN
+     * Let's get the amount in other currencies for 50 VEN
+     * @dataProvider getVenAmount
+     *
+     * @param float  $venAmount
+     * @param string $otherCurrencySymbol
+     * @param string $expectedOtherCurrency
+     * @param int    $precision
      */
-    public function testConversionFromVen()
-    {
-        $venMoney = new Money(50, Currency::VEN());
+    public function testConversionFromVenToOtherCurrencies(
+        $venAmount,
+        $otherCurrencySymbol,
+        $expectedOtherCurrency,
+        $precision
+    ) {
+        $venMoney = new Money($venAmount, Currency::VEN());
 
         $actualUsdMoney = $this->sut->convertFromVenToOther($venMoney, Currency::USD());
 
-        $this->assertEquals('4.9342', $actualUsdMoney->getAmountAsString());
-        $this->assertSame('USD', (string)$actualUsdMoney->getCurrency());
+        $this->assertEquals($expectedOtherCurrency, $actualUsdMoney->getAmountAsString($precision));
+        $this->assertSame($otherCurrencySymbol, (string)$actualUsdMoney->getCurrency());
+    }
+
+    /**
+     * @return array
+     */
+    public function getVenAmount()
+    {
+        return [
+            // 1 Ven = 0.0986845216 USD
+            'one-ven-should-match-the-rating' => [1, 'USD', self::USD_FOR_ONE_VEN, 10 /*precision*/],
+            // 2 Ven = 0.1973690432 USD
+            'two-ven' => [2, 'USD', self::USD_FOR_ONE_VEN * 2, 10],
+            // 50 Ven = 4.93 USD
+            'fifty-ven' => [50, 'USD', 4.93, 2],
+        ];
     }
 }
