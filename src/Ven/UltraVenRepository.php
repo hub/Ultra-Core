@@ -75,8 +75,9 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 SQL
         );
 
-        $preparedStmt->bind_param('iidisiss', $fromUserId, $toUserId, $amount, time(), $message, intval($hide),
-            $special, $type);
+        $now = time();
+        $hide = intval($hide);
+        $preparedStmt->bind_param('iidisiss', $fromUserId, $toUserId, $amount, $now, $message, $hide, $special, $type);
         $created = $preparedStmt->execute();
         if ($created) {
             // deduct/debit ven from the sender
