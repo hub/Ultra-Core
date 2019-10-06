@@ -79,6 +79,10 @@ class Money
      */
     public function divideBy($divisionValue)
     {
+        if ($divisionValue == 0) {
+            return new self($this->getAmount(), $this->getCurrency());
+        }
+
         return new self($this->getAmount() / $divisionValue, $this->getCurrency());
     }
 
