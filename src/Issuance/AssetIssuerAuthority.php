@@ -4,11 +4,11 @@
  * @copyright (c) 2019 by HubCulture Ltd.
  */
 
-namespace Hub\UltraCore\Asset;
+namespace Hub\UltraCore\Issuance;
 
 /**
  * Class AssetIssuerAuthority
- * @package Hub\UltraCore\Asset
+ * @package Hub\UltraCore\Issuance
  */
 class AssetIssuerAuthority
 {
@@ -30,7 +30,7 @@ class AssetIssuerAuthority
     /**
      * @var float
      */
-    private $usableAssetQuantity;
+    private $saleableAssetQuantity;
 
     /**
      * AssetIssuerAuthority constructor.
@@ -38,19 +38,19 @@ class AssetIssuerAuthority
      * @param int   $authorityUserId        Hub authority user unique identifier.
      * @param float $originalQuantityIssued Issued Number of asset issued at the time of issuance.
      * @param float $remainingAssetQuantity The remaining number of assets.
-     * @param float $usableAssetQuantity    [optional] Amount which is usable for any action like a buy order from this
-     *                                      authority.
+     * @param float $saleableAssetQuantity  [optional] The amount which is sell-able off of the remaining asset
+     *                                      quantity. ex: During a purchase order from a buyer.
      */
     public function __construct(
         $authorityUserId,
         $originalQuantityIssued,
         $remainingAssetQuantity,
-        $usableAssetQuantity = 0.0
+        $saleableAssetQuantity = 0.0
     ) {
         $this->authorityUserId = $authorityUserId;
         $this->originalQuantityIssued = $originalQuantityIssued;
         $this->remainingAssetQuantity = $remainingAssetQuantity;
-        $this->usableAssetQuantity = $usableAssetQuantity;
+        $this->saleableAssetQuantity = $saleableAssetQuantity;
     }
 
     /**
@@ -78,21 +78,21 @@ class AssetIssuerAuthority
     }
 
     /**
-     * This is the amount which can be used off of this authority users issued asset pool.
+     * Returns the amount which is sell-able off of the remaining asset quantity.
      *
      * @return float
      */
-    public function getUsableAssetQuantity()
+    public function getSaleableAssetQuantity()
     {
-        return $this->usableAssetQuantity;
+        return $this->saleableAssetQuantity;
     }
 
     /**
-     * @param float $usableAssetQuantity    Amount which is usable for any action like a 'buy order' from this
-     *                                      authority.
+     * @param float $saleableAssetQuantity The amount which is sell-able off of the remaining asset quantity.
+     *                                     ex: During a purchase order from a buyer.
      */
-    public function setUsableAssetQuantity($usableAssetQuantity)
+    public function setSaleableAssetQuantity($saleableAssetQuantity)
     {
-        $this->usableAssetQuantity = $usableAssetQuantity;
+        $this->saleableAssetQuantity = $saleableAssetQuantity;
     }
 }

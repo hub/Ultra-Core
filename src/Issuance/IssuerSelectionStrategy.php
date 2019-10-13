@@ -4,7 +4,7 @@
  * @copyright (c) 2019 by HubCulture Ltd.
  */
 
-namespace Hub\UltraCore\Asset;
+namespace Hub\UltraCore\Issuance;
 
 use Hub\UltraCore\UltraAsset;
 
@@ -19,7 +19,7 @@ use Hub\UltraCore\UltraAsset;
  * Therefore an ultra asset issuer selection strategy needed to be used to select issuers together with the quantity.
  *
  * Interface IssuerSelectionStrategy
- * @package Hub\UltraCore\Asset
+ * @package Hub\UltraCore\Issuance
  */
 interface IssuerSelectionStrategy
 {

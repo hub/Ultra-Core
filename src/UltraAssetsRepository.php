@@ -133,7 +133,7 @@ UPDATE `ultra_asset_issuance_history`
     SET `remaining_asset_quantity` = `remaining_asset_quantity` - {$quantity}
 WHERE
     `user_id` = {$authorityIssuerId}
-    AND `asset_id`` = {$assetId}
+    AND `asset_id` = {$assetId}
 SQL
         );
     }

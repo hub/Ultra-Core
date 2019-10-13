@@ -6,7 +6,7 @@
 
 namespace Hub\UltraCore;
 
-use Hub\UltraCore\Asset\IssuerSelectionStrategy;
+use Hub\UltraCore\Issuance\IssuerSelectionStrategy;
 use Hub\UltraCore\Exception\WalletException;
 use Hub\UltraCore\Money\Currency;
 use Hub\UltraCore\Money\Exchange;
@@ -127,13 +127,13 @@ class DefaultWalletHandler implements WalletHandler
 
         $issuers = $this->assetSelectionStrategy->select($asset, $purchaseAssetAmount);
         foreach ($issuers as $issuer) {
-            $this->ultraAssetsRepository->deductAssetQuantityBy($issuer->getAuthorityUserId(), $asset->id(), $issuer->getUsableAssetQuantity());
+            $this->ultraAssetsRepository->deductAssetQuantityBy($issuer->getAuthorityUserId(), $asset->id(), $issuer->getSaleableAssetQuantity());
             // reduce the amount paid in VEN from the user's VEN account and credit it to the each asset issuer account.
-            $venMessage = "Purchased an amount of {$issuer->getUsableAssetQuantity()} {$asset->title()} assets @{$venAmountForOneAsset} VEN per 1 {$asset->title()}. Click <a href='/markets/my-wallets/transactions?id={$wallet->getId()}'>here</a> for more info.";
+            $venMessage = "Purchased an amount of {$issuer->getSaleableAssetQuantity()} {$asset->title()} assets @{$venAmountForOneAsset} VEN per 1 {$asset->title()}. Click <a href='/markets/my-wallets/transactions?id={$wallet->getId()}'>here</a> for more info.";
             $this->venRepository->sendVen(
                 $userId,
                 $issuer->getAuthorityUserId(),
-                ($venAmountForOneAsset * $issuer->getUsableAssetQuantity()),
+                ($venAmountForOneAsset * $issuer->getSaleableAssetQuantity()),
                 $venMessage
             );
         }

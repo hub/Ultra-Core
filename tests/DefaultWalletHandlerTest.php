@@ -6,8 +6,8 @@
 
 namespace Hub\UltraCore;
 
-use Hub\UltraCore\Asset\AssetIssuerAuthority;
-use Hub\UltraCore\Asset\IssuerSelectionStrategy;
+use Hub\UltraCore\Issuance\AssetIssuerAuthority;
+use Hub\UltraCore\Issuance\IssuerSelectionStrategy;
 use Hub\UltraCore\Money\Currency;
 use Hub\UltraCore\Money\Exchange;
 use Hub\UltraCore\Money\Money;

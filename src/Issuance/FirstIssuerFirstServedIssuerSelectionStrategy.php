@@ -4,7 +4,7 @@
  * @copyright (c) 2019 by HubCulture Ltd.
  */
 
-namespace Hub\UltraCore\Asset;
+namespace Hub\UltraCore\Issuance;
 
 use Hub\UltraCore\UltraAsset;
 use mysqli;
@@ -15,7 +15,7 @@ use mysqli;
  * will be processed first.
  *
  * Class FirstIssuerFirstServedIssuerSelectionStrategy
- * @package Hub\UltraCore\Asset
+ * @package Hub\UltraCore\Issuance
  */
 class FirstIssuerFirstServedIssuerSelectionStrategy implements IssuerSelectionStrategy
 {
@@ -77,10 +77,10 @@ SQL
                 floatval($issuance['remaining_asset_quantity'])
             );
             if (floatval($issuance['remaining_asset_quantity']) > $requiredQuantity) {
-                $assetIssuerAuthority->setUsableAssetQuantity($requiredQuantity);
+                $assetIssuerAuthority->setSaleableAssetQuantity($requiredQuantity);
                 $requiredQuantity = 0;
             } else {
-                $assetIssuerAuthority->setUsableAssetQuantity(floatval($issuance['remaining_asset_quantity']));
+                $assetIssuerAuthority->setSaleableAssetQuantity(floatval($issuance['remaining_asset_quantity']));
                 $requiredQuantity = $requiredQuantity - $issuance['remaining_asset_quantity'];
             }
 
