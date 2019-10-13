@@ -114,9 +114,28 @@ class UltraAssetsRepository
      * @param int $assetId
      * @param float $quantity
      */
-    public function deductAssetQuantityBy($assetId, $quantity)
+    public function deductTotalAssetQuantityBy($assetId, $quantity)
     {
         $this->dbConnection->query("UPDATE ultra_assets SET num_assets = num_assets - {$quantity} WHERE id = {$assetId}");
+    }
+
+    /**
+     * Use this to update the Ultra issuance transaction table.
+     *
+     * @param int $authorityIssuerId Hub authority issuer user id.
+     * @param int $assetId ultra asset identifier
+     * @param float $quantity
+     */
+    public function deductAssetQuantityBy($authorityIssuerId, $assetId, $quantity)
+    {
+        $this->dbConnection->query(<<<SQL
+UPDATE `ultra_asset_issuance_history`
+    SET `remaining_asset_quantity` = `remaining_asset_quantity` - {$quantity}
+WHERE
+    `user_id` = {$authorityIssuerId}
+    AND `asset_id` = {$assetId}
+SQL
+        );
     }
 
     /**

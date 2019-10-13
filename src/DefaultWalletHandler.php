@@ -6,6 +6,7 @@
 
 namespace Hub\UltraCore;
 
+use Hub\UltraCore\Issuance\IssuerSelectionStrategy;
 use Hub\UltraCore\Exception\WalletException;
 use Hub\UltraCore\Money\Currency;
 use Hub\UltraCore\Money\Exchange;
@@ -41,21 +42,29 @@ class DefaultWalletHandler implements WalletHandler
     private $exchange;
 
     /**
-     * @param UltraVenRepository    $venRepository
-     * @param UltraAssetsRepository $ultraAssetsRepository
-     * @param WalletRepository      $walletRepository
-     * @param Exchange              $exchange
+     * @var IssuerSelectionStrategy
+     */
+    private $assetSelectionStrategy;
+
+    /**
+     * @param UltraVenRepository      $venRepository
+     * @param UltraAssetsRepository   $ultraAssetsRepository
+     * @param WalletRepository        $walletRepository
+     * @param Exchange                $exchange
+     * @param IssuerSelectionStrategy $assetSelectionStrategy
      */
     public function __construct(
         UltraVenRepository $venRepository,
         UltraAssetsRepository $ultraAssetsRepository,
         WalletRepository $walletRepository,
-        Exchange $exchange
+        Exchange $exchange,
+        IssuerSelectionStrategy $assetSelectionStrategy
     ) {
         $this->venRepository = $venRepository;
         $this->ultraAssetsRepository = $ultraAssetsRepository;
         $this->walletRepository = $walletRepository;
         $this->exchange = $exchange;
+        $this->assetSelectionStrategy = $assetSelectionStrategy;
     }
 
     /**
@@ -114,11 +123,20 @@ class DefaultWalletHandler implements WalletHandler
         $this->walletRepository->credit($wallet, $purchaseAssetAmount, $metaData);
 
         // deduct the number of available assets now as we credited some for a user's wallet.
-        $this->ultraAssetsRepository->deductAssetQuantityBy($asset->id(), $purchaseAssetAmount);
+        $this->ultraAssetsRepository->deductTotalAssetQuantityBy($asset->id(), $purchaseAssetAmount);
 
-        // reduce the amount paid in VEN from the user's VEN account and credit it to the asset issuer account.
-        $venMessage = "Purchased an amount of {$purchaseAssetAmount} {$asset->title()} assets @{$venAmountForOneAsset} VEN per 1 {$asset->title()}. Click <a href='/markets/my-wallets/transactions?id={$wallet->getId()}'>here</a> for more info.";
-        $this->venRepository->sendVen($userId, $asset->authorityUserId(), $totalVenAmountForAssets, $venMessage);
+        $issuers = $this->assetSelectionStrategy->select($asset, $purchaseAssetAmount);
+        foreach ($issuers as $issuer) {
+            $this->ultraAssetsRepository->deductAssetQuantityBy($issuer->getAuthorityUserId(), $asset->id(), $issuer->getSaleableAssetQuantity());
+            // reduce the amount paid in VEN from the user's VEN account and credit it to the each asset issuer account.
+            $venMessage = "Purchased an amount of {$issuer->getSaleableAssetQuantity()} {$asset->title()} assets @{$venAmountForOneAsset} VEN per 1 {$asset->title()}. Click <a href='/markets/my-wallets/transactions?id={$wallet->getId()}'>here</a> for more info.";
+            $this->venRepository->sendVen(
+                $userId,
+                $issuer->getAuthorityUserId(),
+                ($venAmountForOneAsset * $issuer->getSaleableAssetQuantity()),
+                $venMessage
+            );
+        }
     }
 
     /**

@@ -6,6 +6,8 @@
 
 namespace Hub\UltraCore;
 
+use Hub\UltraCore\Issuance\AssetIssuerAuthority;
+use Hub\UltraCore\Issuance\IssuerSelectionStrategy;
 use Hub\UltraCore\Money\Currency;
 use Hub\UltraCore\Money\Exchange;
 use Hub\UltraCore\Money\Money;
@@ -61,12 +63,12 @@ class DefaultWalletHandlerTest extends TestCase
             "Purchased an amount of {$testPurchaseAssetAmount} {$testAssetTitle} assets @{$testVenAmountForOneAsset} VEN per 1 {$testAssetTitle}. Click <a href='/markets/my-wallets/transactions?id=1'>here</a> for more info."
         );
 
-        // UltraAssetsRepository
+        // UltraAsset
         $assetMock = Mockery::mock(UltraAsset::class);
         $assetMock->shouldReceive('id')->once()->andReturn($testAssetId);
         $assetMock->shouldReceive('title')->once()->andReturn($testAssetTitle);
         $assetMock->shouldReceive('authorityUserId')->once()->andReturn($testAssetIssuerUserId);
-        $assetMock->shouldReceive('numAssets')->twice()->andReturn($testAvailableAssetBalance );
+        $assetMock->shouldReceive('numAssets')->twice()->andReturn($testAvailableAssetBalance);
         $assetMock->shouldReceive('getCurrency')->once()->andReturn(Currency::VEN());
         $assetMock->shouldReceive('weightings')->once()->andReturn($testWeightings);
         $assetMock->shouldReceive('tickerSymbol')->once()->andReturn('uTICK');
@@ -77,9 +79,13 @@ class DefaultWalletHandlerTest extends TestCase
         $exchangeMock->shouldReceive('convertFromVenToOther')
             ->andReturn(new Money(0.1, Currency::custom('uTICK'))); // ASSET AMOUNT
 
+        // UltraAssetsRepository
         $assetRepoMock = Mockery::mock(UltraAssetsRepository::class);
         $assetRepoMock->shouldReceive('getAssetWeightings')->once()->andReturn($testWeightings);
-        $assetRepoMock->shouldReceive('deductAssetQuantityBy')->once()->with($testAssetId, $testPurchaseAssetAmount);
+        $assetRepoMock->shouldReceive('deductTotalAssetQuantityBy')->once()->with($testAssetId, $testPurchaseAssetAmount);
+        $assetRepoMock->shouldReceive('deductAssetQuantityBy')
+            ->once()
+            ->with($testAssetIssuerUserId, $testAssetId, $testPurchaseAssetAmount);
 
         // WalletRepository
         $walletMock = Mockery::namedMock(Wallet::class);
@@ -100,7 +106,13 @@ class DefaultWalletHandlerTest extends TestCase
             )
         );
 
-        $sut = new DefaultWalletHandler($venRepoMock, $assetRepoMock, $walletRepoMock, $exchangeMock);
+        // SelectionStrategy
+        $selectionStrategyMock = Mockery::mock(IssuerSelectionStrategy::class);
+        $selectionStrategyMock->shouldReceive('select')->andReturn(array(
+            new AssetIssuerAuthority($testAssetIssuerUserId, 100, 100, $testPurchaseAssetAmount)
+        ));
+
+        $sut = new DefaultWalletHandler($venRepoMock, $assetRepoMock, $walletRepoMock, $exchangeMock, $selectionStrategyMock);
         $sut->purchase($testAssetBuyerUserId, $assetMock, $testPurchaseAssetAmount);
     }
 
@@ -136,14 +148,18 @@ class DefaultWalletHandlerTest extends TestCase
         // WalletRepository
         $walletRepoMock = Mockery::mock(WalletRepository::class);
 
-        $sut = new DefaultWalletHandler($venRepoMock, $assetRepoMock, $walletRepoMock, $exchangeMock);
+        // SelectionStrategy
+        $selectionStrategyMock = Mockery::mock(IssuerSelectionStrategy::class);
+
+        $sut = new DefaultWalletHandler($venRepoMock, $assetRepoMock, $walletRepoMock, $exchangeMock, $selectionStrategyMock);
         $sut->purchase($testUserId, $assetMock, $testPurchaseAssetAmount);
     }
 
     /**
      * @test
      * @expectedException \Hub\UltraCore\Exception\InsufficientAssetAvailabilityException
-     * @expectedExceptionMessage There are no such amount of assets available for your requested amount of 12. Only 11 available.
+     * @expectedExceptionMessage There are no such amount of assets available for your requested amount of 12. Only 11
+     *                           available.
      */
     public function shouldThrowExceptionWhenTryingToPurchaseMoreAssetsThenTheAvailableAmount()
     {
@@ -173,7 +189,10 @@ class DefaultWalletHandlerTest extends TestCase
         // WalletRepository
         $walletRepoMock = Mockery::mock(WalletRepository::class);
 
-        $sut = new DefaultWalletHandler($venRepoMock, $assetRepoMock, $walletRepoMock, $exchangeMock);
+        // SelectionStrategy
+        $selectionStrategyMock = Mockery::mock(IssuerSelectionStrategy::class);
+
+        $sut = new DefaultWalletHandler($venRepoMock, $assetRepoMock, $walletRepoMock, $exchangeMock, $selectionStrategyMock);
         $sut->purchase($testUserId, $assetMock, $testAssetBuyAmount);
     }
 }
