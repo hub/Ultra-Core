@@ -90,4 +90,18 @@ class Wallet
     {
         return $this->availableBalance;
     }
+
+    /**
+     * @return array
+     */
+    public function toArray()
+    {
+        return array(
+            'id' => $this->getId(),
+            'userId' => $this->getUserId(),
+            'assetId' => $this->getAssetId(),
+            'balance' => $this->getBalance(),
+            'availableBalance' => $this->getAvailableBalance(),
+        );
+    }
 }

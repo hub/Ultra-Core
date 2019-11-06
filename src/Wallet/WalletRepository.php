@@ -26,7 +26,7 @@ class WalletRepository
     /**
      * WalletRepository constructor.
      *
-     * @param mysqli $dbConnection A main HubCulture database write connection
+     * @param mysqli               $dbConnection A main HubCulture database write connection
      * @param LoggerInterface|null $logger
      */
     public function __construct(mysqli $dbConnection, LoggerInterface $logger = null)
@@ -39,7 +39,7 @@ class WalletRepository
      * @param int $userId Hub Culture user identifier.
      * @param int $assetId
      *
-     * @return Wallet
+     * @return Wallet|null
      */
     public function getUserWallet($userId, $assetId)
     {
@@ -54,7 +54,11 @@ SQL
             $publicKey = md5(sprintf('%d:%d:%s', $userId, $assetId, time()));
             $balance = 0;
             $preparedStmt->bind_param('iiis', $userId, $assetId, $balance, $publicKey);
-            $preparedStmt->execute();
+            $executed = $preparedStmt->execute();
+            if (!$executed) {
+                return null;
+            }
+
             $wallet = new Wallet($preparedStmt->insert_id, $userId, $assetId, $balance, $balance);
             $this->logger->debug("A new wallet has been created for user [{$userId}] for asset [{$assetId}]");
         }
@@ -63,10 +67,37 @@ SQL
     }
 
     /**
+     * Use this to get all the wallets belong to a given user.
+     *
+     * @param int $userId A valid user id.
+     *
+     * @return Wallet[]
+     */
+    public function getUserWallets($userId)
+    {
+        $stmt = $this->dbConnection->prepare(
+            'SELECT `id`, `user_id`, `asset_id`, `balance`, `available_balance` FROM `wallets` WHERE `user_id` = ?'
+        );
+        $stmt->bind_param("i", $userId);
+        $executed = $stmt->execute();
+        if (!$executed) {
+            return array();
+        }
+
+        $wallets = array();
+        $stmt->bind_result($id, $userId, $assetId, $balance, $availableBalance);
+        while ($stmt->fetch()) {
+            $wallets[] = new Wallet($id, $userId, $assetId, $balance, $availableBalance);
+        }
+
+        return $wallets;
+    }
+
+    /**
      * @param int $userId Hub Culture user identifier.
      * @param int $assetId
      *
-     * @return Wallet
+     * @return Wallet|null
      */
     public function getUserWalletOrNull($userId, $assetId)
     {
