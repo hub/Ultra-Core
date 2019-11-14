@@ -80,8 +80,26 @@ class DefaultWalletHandler implements WalletHandler
      */
     public function purchase($userId, UltraAsset $asset, $purchaseAssetAmount)
     {
+        if (floatval($purchaseAssetAmount) <= 0.0) {
+            throw new WalletException("Purchase amount must be greater than zero(0)");
+        }
+
         $venWallet = $this->venRepository->getVenWalletOfUser($userId);
-        $venAmountForOneAsset = $this->exchange->convertToVen(new Money(1, $asset->getCurrency()))->getAmount();
+        if (is_null($venWallet)) {
+            throw new WalletException(sprintf("Cannot find the Ven wallet for the given user : %s", $userId));
+        }
+
+        $weightings = $asset->weightings();
+
+        // let's determine the price of the asset in Ven
+        if ($asset->isWithOneWeighting() && $asset->weightingType() === UltraAssetsRepository::TYPE_VEN_AMOUNT) {
+            /** @var UltraAssetWeighting $weighting */
+            $customVenWeighting = $weightings;
+            $weighting = array_shift($customVenWeighting);
+            $venAmountForOneAsset = $weighting->currencyAmount();
+        } else {
+            $venAmountForOneAsset = $this->exchange->convertToVen(new Money(1, $asset->getCurrency()))->getAmount();
+        }
 
         // ven balance validation : do not let them pay ven they don't have in their balance
         $totalVenAmountForAssets = ($venAmountForOneAsset * $purchaseAssetAmount);
@@ -104,7 +122,6 @@ class DefaultWalletHandler implements WalletHandler
         }
 
         $weightingConfig = [];
-        $weightings = $asset->weightings();
         array_walk($weightings, function (UltraAssetWeighting $weighting) use (&$weightingConfig) {
             $weightingConfig[] = $weighting->toArray();
         });
@@ -127,7 +144,8 @@ class DefaultWalletHandler implements WalletHandler
 
         $issuers = $this->assetSelectionStrategy->select($asset, $purchaseAssetAmount);
         foreach ($issuers as $issuer) {
-            $this->ultraAssetsRepository->deductAssetQuantityBy($issuer->getAuthorityUserId(), $asset->id(), $issuer->getSaleableAssetQuantity());
+            $this->ultraAssetsRepository->deductAssetQuantityBy($issuer->getAuthorityUserId(), $asset->id(),
+                $issuer->getSaleableAssetQuantity());
             // reduce the amount paid in VEN from the user's VEN account and credit it to the each asset issuer account.
             $venMessage = "Purchased an amount of {$issuer->getSaleableAssetQuantity()} {$asset->title()} assets @{$venAmountForOneAsset} VEN per 1 {$asset->title()}. Click <a href='/markets/my-wallets/transactions?id={$wallet->getId()}'>here</a> for more info.";
             $this->venRepository->sendVen(
