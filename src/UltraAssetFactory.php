@@ -15,6 +15,11 @@ class UltraAssetFactory
      */
     public static function fromArray(array $asset)
     {
+        $explicitVenAmount = 0.0;
+        if (!empty($asset['explicit_ven_amount'])) {
+            $explicitVenAmount = floatval($asset['explicit_ven_amount']);
+        }
+
         $assetObj = new UltraAsset(
             $asset['id'],
             $asset['hash'],
@@ -28,7 +33,7 @@ class UltraAssetFactory
             $asset['is_featured'],
             $asset['user_id'],
             $asset['weighting_type'],
-            self::extractAssetWeightings($asset['weightings'], $asset['weighting_type']),
+            self::extractAssetWeightings($asset['weightings'], $asset['weighting_type'], $explicitVenAmount),
             $asset['created_at']
         );
 
@@ -40,15 +45,16 @@ class UltraAssetFactory
     }
 
     /**
-     * @param $weightingsString
-     * @param $weightingType
+     * @param string $weightingsString
+     * @param string $weightingType
+     * @param float $explicitVenAmount
      *
      * @return UltraAssetWeighting[]
      */
-    public static function extractAssetWeightings($weightingsString, $weightingType)
+    public static function extractAssetWeightings($weightingsString, $weightingType, $explicitVenAmount = 0.0)
     {
-        if ($weightingType === 'custom_ven_amount') {
-            return array(new UltraAssetWeighting('Ven', $weightingsString, 100));
+        if ($weightingType !== UltraAssetsRepository::TYPE_CURRENCY_COMBO) {
+            return array(new UltraAssetWeighting('Ven', $explicitVenAmount, 100));
         }
 
         $rawWeightings = json_decode($weightingsString, true);

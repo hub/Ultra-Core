@@ -72,6 +72,8 @@ class DefaultWalletHandlerTest extends TestCase
         $assetMock->shouldReceive('getCurrency')->once()->andReturn(Currency::VEN());
         $assetMock->shouldReceive('weightings')->once()->andReturn($testWeightings);
         $assetMock->shouldReceive('tickerSymbol')->once()->andReturn('uTICK');
+        $assetMock->shouldReceive('isWithOneWeighting')->once()->andReturn(false);
+        $assetMock->shouldReceive('weightingType')->once()->andReturn('currency_combination');
 
         // Exchange
         $exchangeMock = Mockery::mock(Exchange::class);
@@ -137,7 +139,10 @@ class DefaultWalletHandlerTest extends TestCase
         // UltraAssetsRepository
         $assetMock = Mockery::mock('\Hub\UltraCore\UltraAsset');
         $assetMock->shouldReceive('numAssets')->once();
+        $assetMock->shouldReceive('weightings')->once()->andReturn([]);
         $assetMock->shouldReceive('getCurrency')->once()->andReturn(Currency::VEN());
+        $assetMock->shouldReceive('isWithOneWeighting')->once()->andReturn(false);
+        $assetMock->shouldReceive('weightingType')->once()->andReturn('currency_combination');
         $assetRepoMock = Mockery::mock('\Hub\UltraCore\UltraAssetsRepository');
 
         // Exchange
@@ -161,7 +166,7 @@ class DefaultWalletHandlerTest extends TestCase
      * @expectedExceptionMessage There are no such amount of assets available for your requested amount of 12. Only 11
      *                           available.
      */
-    public function shouldThrowExceptionWhenTryingToPurchaseMoreAssetsThenTheAvailableAmount()
+    public function shouldThrowExceptionWhenTryingToPurchaseMoreAssetsThanTheAvailableAmount()
     {
         $oneAssetInVen = 8;
         $testUserId = 111;
@@ -178,9 +183,11 @@ class DefaultWalletHandlerTest extends TestCase
         // UltraAssetsRepository
         $assetMock = Mockery::mock('\Hub\UltraCore\UltraAsset');
         $assetMock->shouldReceive('numAssets')->once()->andReturn($totalAvailableAssetAmount);
+        $assetMock->shouldReceive('weightings')->once()->andReturn([]);
         $assetMock->shouldReceive('getCurrency')->once()->andReturn(Currency::VEN());
+        $assetMock->shouldReceive('isWithOneWeighting')->once()->andReturn(false);
+        $assetMock->shouldReceive('weightingType')->once()->andReturn('currency_combination');
         $assetRepoMock = Mockery::mock('\Hub\UltraCore\UltraAssetsRepository');
-        $assetRepoMock->shouldReceive('getVenAmountForOneAsset')->once()->with($assetMock)->andReturn($oneAssetInVen);
 
         // Exchange
         $exchangeMock = Mockery::mock(Exchange::class);
@@ -194,5 +201,94 @@ class DefaultWalletHandlerTest extends TestCase
 
         $sut = new DefaultWalletHandler($venRepoMock, $assetRepoMock, $walletRepoMock, $exchangeMock, $selectionStrategyMock);
         $sut->purchase($testUserId, $assetMock, $testAssetBuyAmount);
+    }
+
+    /**
+     * @test
+     */
+    public function shouldUseTheCustomVenAmountWhenPurchasingSuchAnAsset()
+    {
+        $testAssetId = 99999;
+        $testAvailableAssetBalance = 10;
+        $testAssetTitle = 'TESTASSET';
+        $testAssetBuyerUserId = 111;
+        $testAssetBuyerUserVenBalance = 200.01;
+        $testAssetIssuerUserId = 1062;
+        $testVenAmountForOneAsset = 100;
+        $testPurchaseAssetAmount = 2;
+
+        $testWeightings = [
+            new UltraAssetWeighting('Ven', $testVenAmountForOneAsset, 100),
+        ];
+        $weightingConfig = [];
+        array_walk($testWeightings, function (UltraAssetWeighting $weighting) use (&$weightingConfig) {
+            $weightingConfig[] = $weighting->toArray();
+        });
+
+        // VenRepository
+        $balanceMock = Mockery::mock(VenWallet::class);
+        $balanceMock->shouldReceive('getBalance')->once()->andReturn($testAssetBuyerUserVenBalance);
+        $venRepoMock = Mockery::mock(UltraVenRepository::class);
+        $venRepoMock->shouldReceive('getVenWalletOfUser')->once()->andReturn($balanceMock);
+        $venRepoMock->shouldReceive('sendVen')->once()->with(
+            $testAssetBuyerUserId,
+            $testAssetIssuerUserId,
+            $testVenAmountForOneAsset * $testPurchaseAssetAmount,
+            "Purchased an amount of {$testPurchaseAssetAmount} {$testAssetTitle} assets @{$testVenAmountForOneAsset} VEN per 1 {$testAssetTitle}. Click <a href='/markets/my-wallets/transactions?id=1'>here</a> for more info."
+        );
+
+        // UltraAsset
+        $assetMock = Mockery::mock(UltraAsset::class);
+        $assetMock->shouldReceive('id')->once()->andReturn($testAssetId);
+        $assetMock->shouldReceive('title')->once()->andReturn($testAssetTitle);
+        $assetMock->shouldReceive('authorityUserId')->once()->andReturn($testAssetIssuerUserId);
+        $assetMock->shouldReceive('numAssets')->twice()->andReturn($testAvailableAssetBalance);
+        $assetMock->shouldReceive('getCurrency')->once()->andReturn(Currency::VEN());
+        $assetMock->shouldReceive('weightings')->once()->andReturn($testWeightings);
+        $assetMock->shouldReceive('tickerSymbol')->once()->andReturn('uTICK');
+        // NOTE: Please note that a a custom ven amount based asset pricing is configured below.
+        $assetMock->shouldReceive('weightingType')->once()->andReturn(UltraAssetsRepository::TYPE_VEN_AMOUNT);
+        $assetMock->shouldReceive('isWithOneWeighting')->once()->andReturn(true);
+
+        // Exchange
+        $exchangeMock = Mockery::mock(Exchange::class);
+        $exchangeMock->shouldReceive('convertFromVenToOther')
+            ->andReturn(new Money(0.1, Currency::custom('Ven'))); // ASSET AMOUNT
+
+        // UltraAssetsRepository
+        $assetRepoMock = Mockery::mock(UltraAssetsRepository::class);
+        $assetRepoMock->shouldReceive('getAssetWeightings')->once()->andReturn($testWeightings);
+        $assetRepoMock->shouldReceive('deductTotalAssetQuantityBy')->once()->with($testAssetId, $testPurchaseAssetAmount);
+        $assetRepoMock->shouldReceive('deductAssetQuantityBy')
+            ->once()
+            ->with($testAssetIssuerUserId, $testAssetId, $testPurchaseAssetAmount);
+
+        // WalletRepository
+        $walletMock = Mockery::namedMock(Wallet::class);
+        $walletMock->shouldReceive('getBalance')->once()->andReturn(1);
+        $walletMock->shouldReceive('getId')->once()->andReturn(1);
+        //$walletMock->shouldReceive('save')->withNoArgs()->once();
+        $walletRepoMock = Mockery::mock(WalletRepository::class);
+        $walletRepoMock->shouldReceive('getUserWallet')->once()->andReturn($walletMock);
+        $walletRepoMock->shouldReceive('credit')->once()->with(
+            $walletMock,
+            $testPurchaseAssetAmount,
+            array(
+                'asset_amount_in_ven' => $testVenAmountForOneAsset * $testPurchaseAssetAmount,
+                'asset_amount_for_one_ven' => '0.1000', // ASSET AMOUNT
+                'ven_amount_for_one_asset' => $testVenAmountForOneAsset,
+                'weightingConfig' => $weightingConfig,
+                'commit' => true,
+            )
+        );
+
+        // SelectionStrategy
+        $selectionStrategyMock = Mockery::mock(IssuerSelectionStrategy::class);
+        $selectionStrategyMock->shouldReceive('select')->andReturn(array(
+            new AssetIssuerAuthority($testAssetIssuerUserId, 100, 100, $testPurchaseAssetAmount)
+        ));
+
+        $sut = new DefaultWalletHandler($venRepoMock, $assetRepoMock, $walletRepoMock, $exchangeMock, $selectionStrategyMock);
+        $sut->purchase($testAssetBuyerUserId, $assetMock, $testPurchaseAssetAmount);
     }
 }

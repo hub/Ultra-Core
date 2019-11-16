@@ -6,6 +6,7 @@
 
 namespace Hub\UltraCore;
 
+use Hub\UltraCore\Money\CurrencyRate;
 use Mockery\MockInterface;
 use PHPUnit\Framework\TestCase;
 use Mockery;
@@ -27,12 +28,16 @@ class UltraAssetsRepositoryTest extends TestCase
 
     public function setUp()
     {
+        $testCurrencyRates = [];
+        foreach ($this->testCurrencies as $testCurrency) {
+            $testCurrencyRates[] = new CurrencyRate($testCurrency['secondary_currency'], $testCurrency['current_amount']);
+        }
         $this->mysqliMock = Mockery::mock('\mysqli');
         $currencyRatesProviderMock = Mockery::mock('\Hub\UltraCore\CurrencyRatesProvider');
         $currencyRatesProviderMock
             ->shouldReceive('getByPrimaryCurrencySymbol')
             ->once()
-            ->andReturn($this->testCurrencies);
+            ->andReturn($testCurrencyRates);
 
         $this->sut = new UltraAssetsRepository($this->mysqliMock, $currencyRatesProviderMock);
     }
@@ -96,7 +101,7 @@ class UltraAssetsRepositoryTest extends TestCase
         ];
 
         $assetMock = Mockery::mock('\Hub\UltraCore\UltraAsset');
-        $assetMock->shouldReceive('weightingType')->once();
+        $assetMock->shouldReceive('weightingType')->once()->andReturn(UltraAssetsRepository::TYPE_CURRENCY_COMBO);
         $assetMock->shouldReceive('tickerSymbol')->once();
         $assetMock->shouldReceive('weightings')->once()->andReturn($testWeightingsConfig);
 
@@ -111,6 +116,23 @@ class UltraAssetsRepositoryTest extends TestCase
         $actualAssetValue = $this->sut->getAssetAmountForOneVen($assetMock);
         $this->assertSame($expectedAssetValueInVen, $actualAssetValue->getAmount());
         $this->assertTrue((0.046776965633 === $actualAssetValue->getAmount()));
+    }
+
+    /**
+     * @test
+     */
+    public function shouldReturnTheTotalInVenForCustomVenAmounts()
+    {
+        // asset with custom ven amounts always contain one weighting
+        $testWeightingsConfig = [new UltraAssetWeighting('Ven', 13, 100)];
+
+        $assetMock = Mockery::mock('\Hub\UltraCore\UltraAsset');
+        $assetMock->shouldReceive('weightingType')->once()->andReturn(UltraAssetsRepository::TYPE_EXTERNAL_ENTITY);
+        $assetMock->shouldReceive('tickerSymbol')->once();
+        $assetMock->shouldReceive('weightings')->once()->andReturn($testWeightingsConfig);
+
+        $actualAssetValue = $this->sut->getAssetAmountForOneVen($assetMock);
+        $this->assertSame(13.0, $actualAssetValue->getAmount());
     }
 
     /**
