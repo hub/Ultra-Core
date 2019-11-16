@@ -78,7 +78,7 @@ class UltraEnrichingVenBaseFiatMoneyRateRepository implements BaseFiatMoneyRateR
             $baseExchangeRates[$asset->tickerSymbol()] = new BaseFiatMoney(
                 $this->ultraAssetsRepository->getAssetAmountForOneVen($asset)->getAmount(),
                 $asset->getCurrency(),
-                $asset->tickerSymbol(),
+                $asset->title(),
                 time(),
                 $asset->id(),
                 count($asset->weightings())
