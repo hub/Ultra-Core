@@ -23,7 +23,6 @@ class UltraAssetsRepository
     public static $availableWeightingTypes = array(
         self::TYPE_CURRENCY_COMBO => 'Combining Other Currencies',
         self::TYPE_VEN_AMOUNT => 'Custom VEN amount per asset',
-        // ask Stan what he really wants as I am not aware of the pricing model for this.
         self::TYPE_EXTERNAL_ENTITY => 'Relate to external entity with proof attached/described',
     );
 
@@ -147,7 +146,7 @@ SQL
     public function getAssetAmountForOneVen(UltraAsset $asset)
     {
         $amount = $this->getAssetValue($asset);
-        if ($asset->weightingType() == 'custom_ven_amount') {
+        if ($asset->weightingType() !== self::TYPE_CURRENCY_COMBO && count($asset->weightings()) > 0) {
             $weightings = $asset->weightings();
             $amount = floatval(array_shift($weightings)->currencyAmount());
         }
