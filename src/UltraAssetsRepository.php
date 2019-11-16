@@ -186,10 +186,6 @@ SQL
      */
     public function enrichAssetWeightingAmounts(UltraAsset &$asset)
     {
-        if ($asset->weightingType() != 'currency_combination') {
-            return;
-        }
-
         $currencies = $this->currencyRatesProvider->getByPrimaryCurrencySymbol(Currency::VEN());
 
         $assetWeightings = array();
@@ -211,7 +207,7 @@ SQL
             if (!$isWeightingAdded && strtolower($weighting->currencyName()) == 'ven') {
                 $assetWeightings[] = new UltraAssetWeighting(
                     'Ven',
-                    1,
+                    $weighting->currencyAmount(),
                     $weighting->percentage()
                 );
             }

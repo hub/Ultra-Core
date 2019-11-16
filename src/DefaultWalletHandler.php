@@ -89,17 +89,7 @@ class DefaultWalletHandler implements WalletHandler
             throw new WalletException(sprintf("Cannot find the Ven wallet for the given user : %s", $userId));
         }
 
-        $weightings = $asset->weightings();
-
-        // let's determine the price of the asset in Ven
-        if ($asset->isWithOneWeighting() && $asset->weightingType() === UltraAssetsRepository::TYPE_VEN_AMOUNT) {
-            /** @var UltraAssetWeighting $weighting */
-            $customVenWeighting = $weightings;
-            $weighting = array_shift($customVenWeighting);
-            $venAmountForOneAsset = $weighting->currencyAmount();
-        } else {
-            $venAmountForOneAsset = $this->exchange->convertToVen(new Money(1, $asset->getCurrency()))->getAmount();
-        }
+        $venAmountForOneAsset = $this->getVenAmountForOneAsset($asset);
 
         // ven balance validation : do not let them pay ven they don't have in their balance
         $totalVenAmountForAssets = ($venAmountForOneAsset * $purchaseAssetAmount);
@@ -122,6 +112,7 @@ class DefaultWalletHandler implements WalletHandler
         }
 
         $weightingConfig = [];
+        $weightings = $asset->weightings();
         array_walk($weightings, function (UltraAssetWeighting $weighting) use (&$weightingConfig) {
             $weightingConfig[] = $weighting->toArray();
         });
@@ -186,7 +177,7 @@ class DefaultWalletHandler implements WalletHandler
         });
 
         $metaData = [];
-        $venAmountForOneAsset = $this->exchange->convertToVen(new Money(1, $asset->getCurrency()))->getAmount();
+        $venAmountForOneAsset = $this->getVenAmountForOneAsset($asset);
         $metaData['asset_amount_in_ven'] = ($venAmountForOneAsset * $sellAssetAmount);
         $metaData['asset_amount_for_one_ven'] = $this->exchange
             ->convertFromVenToOther(new Money(1, Currency::VEN()), $asset->getCurrency())
@@ -229,7 +220,7 @@ class DefaultWalletHandler implements WalletHandler
             $weightingConfig[] = $weighting->toArray();
         });
 
-        $venAmountForOneAsset = $this->exchange->convertToVen(new Money(1, $asset->getCurrency()))->getAmount();
+        $venAmountForOneAsset = $this->getVenAmountForOneAsset($asset);
         $metaData['asset_amount_in_ven'] = ($venAmountForOneAsset * $purchaseAssetAmount);
         $metaData['asset_amount_for_one_ven'] = $this->exchange
             ->convertFromVenToOther(new Money(1, Currency::VEN()), $asset->getCurrency())
@@ -245,5 +236,33 @@ class DefaultWalletHandler implements WalletHandler
 
         $metaData['transfer_related_user'] = $receiverId;
         $this->walletRepository->debit($senderWallet, $purchaseAssetAmount, $metaData);
+    }
+
+    /**
+     * This returns the amount that a user needs to pay in Ven to buy/sell an Ultra asset.
+     *
+     * @param UltraAsset $asset The ultra asset that needs calculating.
+     *
+     * @return float The amount in ven required to buy one 1 Ultra asset.
+     */
+    private function getVenAmountForOneAsset(UltraAsset $asset)
+    {
+        $weightings = $asset->weightings();
+
+        /**
+         * Let's determine the price of the asset in Ven.
+         * If the pricing model is not based on a currency composition, it is always a ones with a custom Ven amount.
+         * In such a case where the price is set as a weighting by the UltraAssetFactory.
+         * @see UltraAssetFactory::extractAssetWeightings()
+         */
+        if ($asset->weightingType() !== UltraAssetsRepository::TYPE_CURRENCY_COMBO && $asset->isWithOneWeighting()) {
+            /** @var UltraAssetWeighting $weighting */
+            $weighting = array_shift($weightings);
+            $venAmountForOneAsset = $weighting->currencyAmount();
+        } else {
+            $venAmountForOneAsset = $this->exchange->convertToVen(new Money(1, $asset->getCurrency()))->getAmount();
+        }
+
+        return $venAmountForOneAsset;
     }
 }

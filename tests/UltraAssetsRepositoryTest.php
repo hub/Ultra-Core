@@ -6,6 +6,7 @@
 
 namespace Hub\UltraCore;
 
+use Hub\UltraCore\Money\CurrencyRate;
 use Mockery\MockInterface;
 use PHPUnit\Framework\TestCase;
 use Mockery;
@@ -27,12 +28,16 @@ class UltraAssetsRepositoryTest extends TestCase
 
     public function setUp()
     {
+        $testCurrencyRates = [];
+        foreach ($this->testCurrencies as $testCurrency) {
+            $testCurrencyRates[] = new CurrencyRate($testCurrency['secondary_currency'], $testCurrency['current_amount']);
+        }
         $this->mysqliMock = Mockery::mock('\mysqli');
         $currencyRatesProviderMock = Mockery::mock('\Hub\UltraCore\CurrencyRatesProvider');
         $currencyRatesProviderMock
             ->shouldReceive('getByPrimaryCurrencySymbol')
             ->once()
-            ->andReturn($this->testCurrencies);
+            ->andReturn($testCurrencyRates);
 
         $this->sut = new UltraAssetsRepository($this->mysqliMock, $currencyRatesProviderMock);
     }

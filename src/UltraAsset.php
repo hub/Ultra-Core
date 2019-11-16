@@ -239,9 +239,9 @@ class UltraAsset
     /**
      * @return bool
      */
-    public function isPlotableInChart()
+    public function isComposedWithOtherCurrencies()
     {
-        return in_array($this->weightingType(), array('currency_combination', 'custom_ven_amount'));
+        return $this->weightingType() === UltraAssetsRepository::TYPE_CURRENCY_COMBO;
     }
 
     /**

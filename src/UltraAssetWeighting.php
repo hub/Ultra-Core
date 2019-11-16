@@ -17,7 +17,7 @@ class UltraAssetWeighting
      *
      * @param string $currencyName   The currency type. Ex: USD, GBP
      * @param string $currencyAmount The currency amount in VEN.
-     * @param int    $percentage     Percentage of the current current type.
+     * @param int    $percentage     Percentage of the current type.
      */
     public function __construct($currencyName, $currencyAmount, $percentage)
     {
