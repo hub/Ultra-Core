@@ -97,4 +97,47 @@ class UltraAssetFactoryTest extends TestCase
         $this->assertSame(100, $actualAssetObject->weightings()[0]->percentage());
         $this->assertSame($testUltraAssetRawData['created_at'], $actualAssetObject->submissionDate());
     }
+
+    /**
+     * @test
+     */
+    public function shouldReturnEmptyArrayWhenCurrencyJsonStringNotValidJson()
+    {
+        $actualWeightings = UltraAssetFactory::extractAssetWeightings(
+            'invalid json string',
+            UltraAssetsRepository::TYPE_CURRENCY_COMBO
+        );
+        $this->assertEmpty($actualWeightings);
+    }
+
+    /**
+     * @test
+     */
+    public function shouldReturnVenWeightingAsPerVenAmountGiven()
+    {
+        $actualWeightings = UltraAssetFactory::extractAssetWeightings(
+            '{not important in this test case as we are sending a custom ven value pricing model / weighting type}',
+            UltraAssetsRepository::TYPE_VEN_AMOUNT,
+            24.567
+        );
+        $this->assertEquals(
+            array(new UltraAssetWeighting('Ven', 24.567, 100)),
+            $actualWeightings
+        );
+    }
+
+    /**
+     * @test
+     */
+    public function shouldReturnCorrectWeightingsAsPerJsonString()
+    {
+        $actualWeightings = UltraAssetFactory::extractAssetWeightings(
+            '[{"type":"VeN","amount":1}]',
+            UltraAssetsRepository::TYPE_CURRENCY_COMBO
+        );
+        $this->assertEquals(
+            array(new UltraAssetWeighting(UltraAssetsRepository::CURRENCY_CODE_VEN_LABEL, 1, 1)),
+            $actualWeightings
+        );
+    }
 }

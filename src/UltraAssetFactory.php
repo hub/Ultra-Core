@@ -47,22 +47,47 @@ class UltraAssetFactory
     /**
      * @param string $weightingsString
      * @param string $weightingType
-     * @param float $explicitVenAmount
+     * @param float  $explicitVenAmount
      *
      * @return UltraAssetWeighting[]
      */
     public static function extractAssetWeightings($weightingsString, $weightingType, $explicitVenAmount = 0.0)
     {
         if ($weightingType !== UltraAssetsRepository::TYPE_CURRENCY_COMBO) {
-            return array(new UltraAssetWeighting('Ven', $explicitVenAmount, 100));
+            return array(
+                new UltraAssetWeighting(
+                    UltraAssetsRepository::CURRENCY_CODE_VEN_LABEL,
+                    $explicitVenAmount,
+                    100
+                ),
+            );
         }
 
-        $rawWeightings = json_decode($weightingsString, true);
+        $rawWeightings = @json_decode($weightingsString, true);
+        if (json_last_error() != JSON_ERROR_NONE) {
+            return array();
+        }
+
+        if (!is_array($rawWeightings)) {
+            return array();
+        }
+
         $weightings = array();
-        if (is_array($rawWeightings)) {
-            foreach ($rawWeightings as $rawWeighting) {
-                $weightings[] = new UltraAssetWeighting($rawWeighting['type'], 0, $rawWeighting['amount']);
+        foreach ($rawWeightings as $rawWeighting) {
+            // default currency amount zero(0) as it will be calculated later in the pipeline.
+            $currencyAmount = 0;
+
+            // however if the combined currency is 'Ven' itself, it is always 1. Coz simply: 1 Ven = 1 Ven
+            if (strtolower($rawWeighting['type']) === 'ven') {
+                $rawWeighting['type'] = UltraAssetsRepository::CURRENCY_CODE_VEN_LABEL;
+                $currencyAmount = 1;
             }
+
+            $weightings[] = new UltraAssetWeighting(
+                $rawWeighting['type'],
+                $currencyAmount,
+                $rawWeighting['amount']
+            );
         }
 
         return $weightings;

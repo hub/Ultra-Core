@@ -54,23 +54,38 @@ class UltraAsset
 
     /**
      * UltraAsset constructor.
-     * @param int $id
-     * @param string $weightingHash
-     * @param string $title
-     * @param string $category
-     * @param string $tickerSymbol
-     * @param float $numAssets
-     * @param string $backgroundImage
-     * @param string $iconImage
-     * @param bool $isApproved
-     * @param bool $isFeatured
-     * @param int $authorityUserId
-     * @param string $weightingType
+     *
+     * @param int                   $id
+     * @param string                $weightingHash
+     * @param string                $title
+     * @param string                $category
+     * @param string                $tickerSymbol
+     * @param float                 $numAssets
+     * @param string                $backgroundImage
+     * @param string                $iconImage
+     * @param bool                  $isApproved
+     * @param bool                  $isFeatured
+     * @param int                   $authorityUserId
+     * @param string                $weightingType
      * @param UltraAssetWeighting[] $weightings
-     * @param string $submissionDate
+     * @param string                $submissionDate
      */
-    public function __construct($id, $weightingHash, $title, $category, $tickerSymbol, $numAssets, $backgroundImage, $iconImage, $isApproved, $isFeatured, $authorityUserId, $weightingType, array $weightings, $submissionDate)
-    {
+    public function __construct(
+        $id,
+        $weightingHash,
+        $title,
+        $category,
+        $tickerSymbol,
+        $numAssets,
+        $backgroundImage,
+        $iconImage,
+        $isApproved,
+        $isFeatured,
+        $authorityUserId,
+        $weightingType,
+        array $weightings,
+        $submissionDate
+    ) {
         $this->id = $id;
         $this->weightingHash = $weightingHash;
         $this->setTitle($title);
@@ -181,19 +196,41 @@ class UltraAsset
     }
 
     /**
+     * @param bool $absolutePath
+     *
      * @return string
      */
-    public function backgroundImage()
+    public function backgroundImage($absolutePath = false)
     {
-        return $this->backgroundImage;
+        $image = empty($this->backgroundImage) ? 'ultra-asset-uploads/default-ultra-asset-background.png' : $this->backgroundImage;
+        if (!$absolutePath) {
+            return $image;
+        }
+
+        if (strpos($image, 'http') === false) {
+            return sprintf('https://s3.amazonaws.com/%s', $image);
+        }
+
+        return $image;
     }
 
     /**
+     * @param bool $absolutePath
+     *
      * @return string
      */
-    public function iconImage()
+    public function iconImage($absolutePath = false)
     {
-        return empty($this->iconImage) ? '/i/default-ultra-asset-icon.png' : $this->iconImage;
+        $image = empty($this->iconImage) ? 'ultra-asset-uploads/default-ultra-asset-icon.png' : $this->iconImage;
+        if (!$absolutePath) {
+            return $image;
+        }
+
+        if (strpos($image, 'http') === false) {
+            return sprintf('https://s3.amazonaws.com/%s', $image);
+        }
+
+        return $image;
     }
 
     /**
@@ -283,6 +320,7 @@ class UltraAsset
 
     /**
      * @param int $percentage
+     *
      * @return UltraAssetWeighting|null
      */
     public function getAssetWeightingByPercentage($percentage = 100)

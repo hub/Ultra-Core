@@ -96,4 +96,52 @@ class UltraAssetTest extends TestCase
         $this->assertSame($testWeighting2, $sut->getAssetWeightingByPercentage(20));
         $this->assertNull($sut->getAssetWeightingByPercentage()); // no base currency with 100% weighting
     }
+
+    /**
+     * @test
+     */
+    public function shouldReturnRequestedImageUrls()
+    {
+        $sut = new UltraAsset(
+            0,
+            '_',
+            '_',
+            '_',
+            '_',
+            0,
+            'backgroundImage.jpg',
+            'iconImage',
+            true,
+            false,
+            0,
+            '_',
+            array(),
+            '_'
+        );
+
+        $this->assertSame('backgroundImage.jpg', $sut->backgroundImage());
+        $this->assertSame('https://s3.amazonaws.com/backgroundImage.jpg', $sut->backgroundImage(true));
+
+
+        $sut = new UltraAsset(
+            0,
+            '_',
+            '_',
+            '_',
+            '_',
+            0,
+            'backgroundImage',
+            'https://www.test.com/iconImage.jpg',
+            true,
+            false,
+            0,
+            '_',
+            array(),
+            '_'
+        );
+
+        $this->assertSame('https://www.test.com/iconImage.jpg', $sut->iconImage());
+        // even if we ask for absolute, if it is stored as an absolute, it should not change that.
+        $this->assertSame('https://www.test.com/iconImage.jpg', $sut->iconImage(true));
+    }
 }

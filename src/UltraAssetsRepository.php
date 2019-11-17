@@ -15,6 +15,7 @@ use mysqli;
 class UltraAssetsRepository
 {
     const CURRENCY_CODE_VEN = 'VEN';
+    const CURRENCY_CODE_VEN_LABEL = 'Ven';
     const DECIMAL_SEPARATOR = '.';
     const TYPE_CURRENCY_COMBO = 'currency_combination';
     const TYPE_VEN_AMOUNT = 'custom_ven_amount';
@@ -47,7 +48,7 @@ class UltraAssetsRepository
     private $currencyRatesProvider;
 
     /**
-     * @param mysqli $dbConnection
+     * @param mysqli                         $dbConnection
      * @param CurrencyRatesProviderInterface $currencyRatesProvider
      */
     public function __construct(
@@ -81,6 +82,7 @@ class UltraAssetsRepository
 
     /**
      * @param int $assetId
+     *
      * @return UltraAsset|null
      */
     public function getAssetById($assetId)
@@ -96,6 +98,7 @@ class UltraAssetsRepository
 
     /**
      * @param string $ticker unique ticker symbol of a ultra asset. ex: uBMD
+     *
      * @return UltraAsset|null
      */
     public function getAssetByTicker($ticker)
@@ -110,7 +113,7 @@ class UltraAssetsRepository
     }
 
     /**
-     * @param int $assetId
+     * @param int   $assetId
      * @param float $quantity
      */
     public function deductTotalAssetQuantityBy($assetId, $quantity)
@@ -121,8 +124,8 @@ class UltraAssetsRepository
     /**
      * Use this to update the Ultra issuance transaction table.
      *
-     * @param int $authorityIssuerId Hub authority issuer user id.
-     * @param int $assetId ultra asset identifier
+     * @param int   $authorityIssuerId Hub authority issuer user id.
+     * @param int   $assetId           ultra asset identifier
      * @param float $quantity
      */
     public function deductAssetQuantityBy($authorityIssuerId, $assetId, $quantity)
@@ -141,6 +144,7 @@ SQL
      * Returns the number of assets required for 1 Ven.
      *
      * @param UltraAsset $asset
+     *
      * @return Money
      */
     public function getAssetAmountForOneVen(UltraAsset $asset)
@@ -156,7 +160,8 @@ SQL
 
     /**
      * @param UltraAsset $asset
-     * @param bool $isFormatted
+     * @param bool       $isFormatted
+     *
      * @return float
      */
     private function getAssetValue(UltraAsset $asset, $isFormatted = false)
@@ -205,7 +210,7 @@ SQL
 
             if (!$isWeightingAdded && strtolower($weighting->currencyName()) == 'ven') {
                 $assetWeightings[] = new UltraAssetWeighting(
-                    'Ven',
+                    self::CURRENCY_CODE_VEN_LABEL,
                     $weighting->currencyAmount(),
                     $weighting->percentage()
                 );
@@ -217,6 +222,7 @@ SQL
 
     /**
      * @param UltraAsset $asset
+     *
      * @return UltraAsset[]
      */
     public function getSimilarAssetsForAsset(UltraAsset $asset)
@@ -249,7 +255,8 @@ SQL
      * returns the quantity to be deducted from assets as per required quantity
      *
      * @param UltraAsset $asset
-     * @param $requiredQuantity
+     * @param            $requiredQuantity
+     *
      * @return array [UltraAsset, float][]
      * @throws InsufficientAssetAvailabilityException
      */
@@ -289,8 +296,9 @@ SQL
     }
 
     /**
-     * @param int $assetId
+     * @param int    $assetId
      * @param string $selectedConditionIds list of term ids
+     *
      * @return int
      */
     public function addAssetTermRelations($assetId, array $selectedConditionIds)
@@ -315,6 +323,7 @@ SQL
 
     /**
      * @param int $assetId
+     *
      * @return bool
      */
     public function removeAssetTermRelations($assetId)
@@ -324,6 +333,7 @@ SQL
 
     /**
      * @param int $assetId
+     *
      * @return array
      */
     public function getAssetTermRelations($assetId)
@@ -358,7 +368,7 @@ SQL
                 continue;
             }
 
-            switch($filterName) {
+            switch ($filterName) {
                 case 'name':
                     $where[] = "title = '{$filterValue}'";
                     break;
