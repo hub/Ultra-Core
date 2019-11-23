@@ -81,7 +81,7 @@ class UltraAssetsRepository
     }
 
     /**
-     * @param int $assetId
+     * @param int $assetId Ultra asset unique identifier.
      *
      * @return UltraAsset|null
      */
@@ -125,7 +125,7 @@ class UltraAssetsRepository
      * Use this to update the Ultra issuance transaction table.
      *
      * @param int   $authorityIssuerId Hub authority issuer user id.
-     * @param int   $assetId           ultra asset identifier
+     * @param int   $assetId           Ultra asset unique identifier.
      * @param float $quantity
      */
     public function deductAssetQuantityBy($authorityIssuerId, $assetId, $quantity)
@@ -255,7 +255,7 @@ SQL
      * returns the quantity to be deducted from assets as per required quantity
      *
      * @param UltraAsset $asset
-     * @param            $requiredQuantity
+     * @param int        $requiredQuantity
      *
      * @return array [UltraAsset, float][]
      * @throws InsufficientAssetAvailabilityException
@@ -296,10 +296,11 @@ SQL
     }
 
     /**
-     * @param int    $assetId
-     * @param string $selectedConditionIds list of term ids
+     * @param int   $assetId              Ultra asset unique identifier.
+     * @param int[] $selectedConditionIds list of term ids
      *
      * @return int
+     * @throws Exception
      */
     public function addAssetTermRelations($assetId, array $selectedConditionIds)
     {
@@ -322,7 +323,7 @@ SQL
     }
 
     /**
-     * @param int $assetId
+     * @param int $assetId Ultra asset unique identifier.
      *
      * @return bool
      */
@@ -332,7 +333,7 @@ SQL
     }
 
     /**
-     * @param int $assetId
+     * @param int $assetId Ultra asset unique identifier.
      *
      * @return array
      */
@@ -349,6 +350,158 @@ SQL
         }
 
         return $terms;
+    }
+
+    /**
+     * Use this to log the quantity of a new ultra asset launched by an authority user.
+     *
+     * This stores a pending record until a super admin reviews and approves the launch later.
+     * @see UltraAssetsRepository::approveIssuance()
+     *
+     * @param int   $assetId            Ultra asset unique identifier.
+     * @param int   $issuingUserId      Issuing user's id who is having 'authority level' membership.
+     * @param float $issuingNewQuantity Issuing asset quantity
+     */
+    public function logUltraAssetLaunch($assetId, $issuingUserId, $issuingNewQuantity)
+    {
+        $this->dbConnection->query(<<<SQL
+            INSERT INTO `ultra_asset_issuance_history`
+            (`user_id`, `asset_id`, `pending_new_quantity`, `created_at`)
+            VALUES (
+                {$issuingUserId},
+                {$assetId},
+                {$issuingNewQuantity},
+                NOW()
+            )
+            ON DUPLICATE KEY UPDATE
+                `pending_new_quantity` = `pending_new_quantity` + VALUES(`pending_new_quantity`),
+                `updated_at` = NOW()
+SQL
+        );
+    }
+
+    /**
+     * Use this to approve a pending ultra asset launch quantity by an authority user.
+     * Only call this as a super admin.
+     *
+     * @param int $assetId       Ultra asset unique identifier.
+     * @param int $issuingUserId Issuing user's id who is having 'authority level' membership.
+     *
+     * @return bool
+     */
+    public function approveIssuance($assetId, $issuingUserId)
+    {
+        $stmt = $this->dbConnection->prepare(
+            "SELECT `pending_new_quantity` FROM `ultra_asset_issuance_history` WHERE `user_id` = ? AND `asset_id` = ?"
+        );
+        $stmt->bind_param("ii", $issuingUserId, $assetId);
+        $executed = $stmt->execute();
+        if (!$executed) {
+            return false;
+        }
+
+        $stmt->bind_result($pendingNewQuantity);
+        $stmt->fetch();
+        if (floatval($pendingNewQuantity) <= 0.0) {
+            return true;
+        }
+        $stmt->free_result();
+
+        $this->dbConnection->begin_transaction();
+        $stmt = $this->dbConnection->prepare(<<<SQL
+            UPDATE `ultra_asset_issuance_history`
+            SET
+                `original_quantity_issued` = `original_quantity_issued` + {$pendingNewQuantity},
+                `remaining_asset_quantity` = `remaining_asset_quantity` + {$pendingNewQuantity},
+                `pending_new_quantity` = 0.0,
+                `updated_at` = NOW()
+            WHERE
+                `user_id` = ?
+                AND `asset_id` = ?
+SQL
+        );
+
+        if (!$stmt) {
+            return false;
+        }
+
+        $stmt->bind_param('ii', $issuingUserId, $assetId);
+        $stmt->execute();
+        $stmt->free_result();
+
+        $stmt = $this->dbConnection->prepare(
+            "UPDATE `ultra_assets` SET `num_assets` = `num_assets` + {$pendingNewQuantity}, `is_approved` = 1, `updated_at` = NOW() WHERE `id` = ?"
+        );
+        if (!$stmt) {
+            $this->dbConnection->rollback();
+            return false;
+        }
+
+        $stmt->bind_param('i', $assetId);
+        $stmt->execute();
+
+        return $this->dbConnection->commit();
+    }
+
+    /**
+     * Use this as a super admin user to deny a pending ultra issuance and to remove the issuance pending record amount.
+     *
+     * @param int $assetId       Ultra asset unique identifier.
+     * @param int $issuingUserId Issuing user's id who is having 'authority level' membership.
+     *
+     * @return bool
+     */
+    public function denyIssuance($assetId, $issuingUserId)
+    {
+        $stmt = $this->dbConnection->prepare("UPDATE `ultra_asset_issuance_history` SET `pending_new_quantity` = 0.0 WHERE `user_id` = ? AND `asset_id` = ?");
+        if ($stmt) {
+            $stmt->bind_param('ii', $issuingUserId, $assetId);
+            return $stmt->execute();
+        }
+
+        return false;
+    }
+
+    /**
+     * Use this to hard delete an unused Ultra asset. This first checks for any usages and only deletes if none.
+     * Because deleting the assets while they are in use is wrong and will be similar banks rejecting USDs from people
+     * who already have them telling USD is no longer identified as a valid currency.
+     *
+     * @param int $assetId Ultra asset unique identifier.
+     *
+     * @throws \RuntimeException
+     */
+    public function deleteUltraAsset($assetId)
+    {
+        $stmt = $this->dbConnection->prepare(
+            "SELECT COUNT(1) AS `usage_count` FROM `wallets` WHERE `asset_id` = ?"
+        );
+        $stmt->bind_param("i", $assetId);
+        $stmt->execute();
+        $stmt->bind_result($walletsInUse);
+        $stmt->fetch();
+        if (intval($walletsInUse) > 0) {
+            throw new \RuntimeException('The asset cannot be deleted as it is already in use');
+        }
+        $stmt->free_result();
+
+        $this->dbConnection->begin_transaction();
+        $stmt = $this->dbConnection->prepare('DELETE FROM `ultra_asset_issuance_history` WHERE `asset_id` = ?');
+        $stmt->bind_param('i', $assetId);
+        $deleted = $stmt->execute();
+        if (!$deleted) {
+            throw new \RuntimeException('Error deleting the ultra launch history');
+        }
+
+        $stmt = $this->dbConnection->prepare('DELETE FROM `ultra_assets` WHERE `id` = ?');
+        $stmt->bind_param('i', $assetId);
+        $deleted = $stmt->execute();
+        if (!$deleted) {
+            $this->dbConnection->rollback();
+            throw new \RuntimeException('Error deleting the ultra asset');
+        }
+
+        $this->dbConnection->commit();
     }
 
     protected function getWeightingEnrichedUltraAsset(array $asset)
