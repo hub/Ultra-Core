@@ -133,10 +133,8 @@ SQL
             return array();
         }
 
-        $limitClause = '';
-        if (intval($offset) > 0 && intval($limit) > 0) {
-            $limitClause = "LIMIT {$offset}, {$limit}";
-        }
+        $offset = intval($offset) === 0 ? 0 : intval($offset);
+        $limit = intval($limit) === 0 ? 10 : intval($limit);
 
         $transactions = array();
         $resultSet = $this->dbConnection->query(<<<SQL
@@ -152,7 +150,7 @@ SQL
             INNER JOIN `ultra_assets` a ON (a.id = w.asset_id)
             WHERE
                 t.`user_id` = {$userId}
-            {$limitClause}
+            LIMIT {$offset}, {$limit}
 SQL
         );
         while ($transaction = $resultSet->fetch_assoc()) {
@@ -186,10 +184,8 @@ SQL
             return array();
         }
 
-        $limitClause = '';
-        if (intval($offset) > 0 && intval($limit) > 0) {
-            $limitClause = "LIMIT {$offset}, {$limit}";
-        }
+        $offset = intval($offset) === 0 ? 0 : intval($offset);
+        $limit = intval($limit) === 0 ? 10 : intval($limit);
 
         $transactions = array();
         $resultSet = $this->dbConnection->query(<<<SQL
@@ -206,7 +202,7 @@ SQL
             WHERE
                 t.`user_id` = {$userId}
                 AND t.`wallet_id` = {$walletId}
-            {$limitClause}
+            LIMIT {$offset}, {$limit}
 SQL
         );
         while ($transaction = $resultSet->fetch_assoc()) {
