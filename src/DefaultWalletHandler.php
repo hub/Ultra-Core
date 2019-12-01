@@ -160,30 +160,49 @@ class DefaultWalletHandler implements WalletHandler
      */
     public function sell($userId, UltraAsset $asset, $sellAssetAmount)
     {
+        // let's calculate the asset amount that the seller needs to pay to cover our commission in ven
+        $withdrawalFee = UltraAssetsRepository::WITHDRAWAL_VEN_FEE;
+        $assetAmountForWithdrawalFee = $this->exchange
+            ->convertFromVenToOther(new Money($withdrawalFee, Currency::VEN()), $asset->getCurrency())
+            ->getAmount();
+
+        $assetAmountForExchangeCommission = $sellAssetAmount * (UltraAssetsRepository::EXCHANGE_PERCENT_FEE / 100);
+        $sellAssetAmount += $assetAmountForWithdrawalFee + $assetAmountForExchangeCommission;
+
         $wallet = $this->walletRepository->getUserWallet($userId, $asset->id());
 
         // ven balance validation : do not let them pay ven they don't have in their balance
         if ($sellAssetAmount > $wallet->getAvailableBalance()) {
             throw new InsufficientUltraAssetBalanceException(sprintf(
-                'Current asset balance of \'%s\' is not sufficient to sell %s of assets',
+                "You do not have enough %s balance to sell an amount of %s assets. Our withdrawal commission is %s %s (%s Ven). You currently have %s in your %s wallet.",
+                $asset->tickerSymbol(),
+                $sellAssetAmount,
+                $assetAmountForWithdrawalFee + $assetAmountForExchangeCommission,
+                $asset->tickerSymbol(),
+                $withdrawalFee,
                 $wallet->getAvailableBalance(),
-                $sellAssetAmount
+                $asset->tickerSymbol()
             ));
         }
 
         $weightingConfig = [];
-        array_walk($asset->weightings(), function (UltraAssetWeighting $weighting) use (&$weightingConfig) {
+        $weightings = $asset->weightings();
+        array_walk($weightings, function (UltraAssetWeighting $weighting) use (&$weightingConfig) {
             $weightingConfig[] = $weighting->toArray();
         });
 
         $metaData = [];
         $venAmountForOneAsset = $this->getVenAmountForOneAsset($asset);
         $metaData['asset_amount_in_ven'] = ($venAmountForOneAsset * $sellAssetAmount);
+        $metaData['asset_amount_for_withdrawal_fee'] = $assetAmountForWithdrawalFee;
+        $metaData['asset_amount_for_exchange_fee'] = $assetAmountForExchangeCommission;
         $metaData['asset_amount_for_one_ven'] = $this->exchange
             ->convertFromVenToOther(new Money(1, Currency::VEN()), $asset->getCurrency())
             ->getAmountAsString();
         $metaData['ven_amount_for_one_asset'] = $venAmountForOneAsset;
         $metaData['weightingConfig'] = $weightingConfig;
+        $metaData['hc_withdrawal_fee'] = UltraAssetsRepository::WITHDRAWAL_VEN_FEE;
+        $metaData['hc_exchange_fee'] = UltraAssetsRepository::EXCHANGE_PERCENT_FEE;
         $metaData['commit'] = false; // sell orders are always processed / committed by an admin for now until we integrate Kraken or other exchange.
 
         $this->walletRepository->debit($wallet, $sellAssetAmount, $metaData);

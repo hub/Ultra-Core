@@ -108,8 +108,10 @@ class Exchange
     private function getRateForOneVen(Currency $fromCurrency)
     {
         $currencies = $this->currencyRatesProvider->getByPrimaryCurrencySymbol(Currency::VEN());
+        $fromCurrencyTicker = strtolower($fromCurrency->getStringRepresentation());
+        $search = [$fromCurrencyTicker, 'u' . $fromCurrencyTicker, preg_replace('/^u/', '', $fromCurrencyTicker)];
         foreach ($currencies as $currency) {
-            if ($currency->getCurrencyName() !== $fromCurrency->getStringRepresentation()) {
+            if (!in_array(strtolower($currency->getCurrencyName()), $search)) {
                 continue;
             }
 

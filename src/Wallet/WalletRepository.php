@@ -119,6 +119,112 @@ SQL
     }
 
     /**
+     * Use this to retrieve all the tranasactions for all wallets of a given user.
+     *
+     * @param int $userId Hub Culture user identifier.
+     * @param int $offset
+     * @param int $limit
+     *
+     * @return array|null
+     */
+    public function getTransactionsByUserId($userId, $offset = 0, $limit = 10)
+    {
+        if (intval($userId) === 0) {
+            return array();
+        }
+
+        $limitClause = '';
+        if (intval($offset) > 0 && intval($limit) > 0) {
+            $limitClause = "LIMIT {$offset}, {$limit}";
+        }
+
+        $transactions = array();
+        $resultSet = $this->dbConnection->query(<<<SQL
+            SELECT
+                a.id AS `asset_id`,
+                a.title AS `asset_title`,
+                a.ticker_symbol AS `asset_ticker_symbol`,
+                w.balance AS `wallet_balance`,
+                w.available_balance AS `wallet_available_balance`,
+                t.*
+            FROM `wallet_transactions` t
+            INNER JOIN `wallets` w ON (w.id = t.wallet_id)
+            INNER JOIN `ultra_assets` a ON (a.id = w.asset_id)
+            WHERE
+                t.`user_id` = {$userId}
+            {$limitClause}
+SQL
+        );
+        while ($transaction = $resultSet->fetch_assoc()) {
+            unset($transaction['id']);
+            unset($transaction['user_id']);
+            unset($transaction['committed_by']);
+            unset($transaction['balance']); // no need to display the current balance of the wallet
+            unset($transaction['is_transfer']);
+            unset($transaction['transfer_message']);
+            unset($transaction['transfer_related_user']);
+            unset($transaction['updated_at']);
+            $transactions[] = $transaction;
+        }
+
+        return $transactions;
+    }
+
+    /**
+     * Use this to retrieve all the tranasactions for all wallets of a given user.
+     *
+     * @param int $userId Hub Culture user identifier.
+     * @param int $walletId A valid wallet id belongs to a user.
+     * @param int $offset
+     * @param int $limit
+     *
+     * @return array|null
+     */
+    public function getWalletTransactionsByUserId($userId, $walletId, $offset = 0, $limit = 10)
+    {
+        if (intval($userId) === 0 || intval($walletId) === 0) {
+            return array();
+        }
+
+        $limitClause = '';
+        if (intval($offset) > 0 && intval($limit) > 0) {
+            $limitClause = "LIMIT {$offset}, {$limit}";
+        }
+
+        $transactions = array();
+        $resultSet = $this->dbConnection->query(<<<SQL
+            SELECT
+                a.id AS `asset_id`,
+                a.title AS `asset_title`,
+                a.ticker_symbol AS `asset_ticker_symbol`,
+                w.balance AS `wallet_balance`,
+                w.available_balance AS `wallet_available_balance`,
+                t.*
+            FROM `wallet_transactions` t
+            INNER JOIN `wallets` w ON (w.id = t.wallet_id)
+            INNER JOIN `ultra_assets` a ON (a.id = w.asset_id)
+            WHERE
+                t.`user_id` = {$userId}
+                AND t.`wallet_id` = {$walletId}
+            {$limitClause}
+SQL
+        );
+        while ($transaction = $resultSet->fetch_assoc()) {
+            unset($transaction['id']);
+            unset($transaction['user_id']);
+            unset($transaction['committed_by']);
+            unset($transaction['balance']); // no need to display the current balance of the wallet
+            unset($transaction['is_transfer']);
+            unset($transaction['transfer_message']);
+            unset($transaction['transfer_related_user']);
+            unset($transaction['updated_at']);
+            $transactions[] = $transaction;
+        }
+
+        return $transactions;
+    }
+
+    /**
      * @param Wallet $wallet user wallet value object
      * @param float  $amount amount to be credited
      * @param array  $metaData
@@ -215,16 +321,20 @@ SQL
         $isTransfer = isset($metaData['is_transfer']) ? 1 : 0;
         $transferMessage = !empty($metaData['transfer_message']) ? $metaData['transfer_message'] : '';
         $transferRelatedUser = !empty($metaData['transfer_related_user']) ? $metaData['transfer_related_user'] : '';
+        $assetAmountForWithdrawalFee = !empty($metaData['asset_amount_for_withdrawal_fee']) ? $metaData['asset_amount_for_withdrawal_fee'] : '';
+        $assetAmountForExchangeCommission = !empty($metaData['asset_amount_for_exchange_fee']) ? $metaData['asset_amount_for_exchange_fee'] : '';
+        $metaDataEncoded = json_encode($metaData);
 
         $preparedStmt = $this->dbConnection->prepare(<<<SQL
 INSERT INTO `wallet_transactions` (
     `user_id`, `wallet_id`, `balance`, `asset_amount`, `is_committed`, `asset_amount_in_ven`, `asset_amount_for_one_ven`,
     `ven_amount_for_one_asset`, `asset_weighting_config`, `is_transfer`, `transfer_message`, `transfer_related_user`,
+    `asset_amount_for_withdrawal_fee`, `asset_amount_for_exchange_fee`, `meta_data`,
     `created_at`
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
 SQL
         );
-        $preparedStmt->bind_param('iiddidddsiss',
+        $preparedStmt->bind_param('iiddidddsisssss',
             $userId,
             $walletId,
             $balance,
@@ -236,7 +346,10 @@ SQL
             $assetWeightingConfig,
             $isTransfer,
             $transferMessage,
-            $transferRelatedUser
+            $transferRelatedUser,
+            $assetAmountForWithdrawalFee,
+            $assetAmountForExchangeCommission,
+            $metaDataEncoded
         );
 
         return $preparedStmt->execute();

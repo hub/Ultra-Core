@@ -20,6 +20,8 @@ class UltraAssetsRepository
     const TYPE_CURRENCY_COMBO = 'currency_combination';
     const TYPE_VEN_AMOUNT = 'custom_ven_amount';
     const TYPE_EXTERNAL_ENTITY = 'external_entity_with_description';
+    const WITHDRAWAL_VEN_FEE = 350;
+    const EXCHANGE_PERCENT_FEE = 1;
 
     public static $availableWeightingTypes = array(
         self::TYPE_CURRENCY_COMBO => 'Combining Other Currencies',
@@ -87,6 +89,10 @@ class UltraAssetsRepository
      */
     public function getAssetById($assetId)
     {
+        if (intval($assetId) === 0) {
+            return null;
+        }
+
         /** @var \mysqli_result $stmt */
         $stmt = $this->dbConnection->query("SELECT * FROM ultra_assets WHERE id = {$assetId}");
         if ($stmt->num_rows === 0) {
