@@ -142,6 +142,7 @@ SQL
                 a.id AS `asset_id`,
                 a.title AS `asset_title`,
                 a.ticker_symbol AS `asset_ticker_symbol`,
+                a.num_assets AS `asset_balance`,
                 w.balance AS `wallet_balance`,
                 w.available_balance AS `wallet_available_balance`,
                 t.*
@@ -193,6 +194,7 @@ SQL
                 a.id AS `asset_id`,
                 a.title AS `asset_title`,
                 a.ticker_symbol AS `asset_ticker_symbol`,
+                a.num_assets AS `asset_balance`,
                 w.balance AS `wallet_balance`,
                 w.available_balance AS `wallet_available_balance`,
                 t.*
