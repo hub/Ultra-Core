@@ -10,9 +10,6 @@ use Hub\UltraCore\Money\Currency;
 
 class UltraAsset
 {
-    /** @var bool */
-    private $isMergedAsset = false;
-
     /** @var int */
     private $id;
 
@@ -100,19 +97,6 @@ class UltraAsset
         $this->weightingType = $weightingType;
         $this->weightings = $weightings;
         $this->submissionDate = $submissionDate;
-    }
-
-    /**
-     * @return bool
-     */
-    public function isMergedAsset()
-    {
-        return $this->isMergedAsset;
-    }
-
-    public function markAsMergedAsset()
-    {
-        $this->isMergedAsset = true;
     }
 
     /**
@@ -295,6 +279,8 @@ class UltraAsset
     }
 
     /**
+     * @param string $format
+     *
      * @return string
      */
     public function submissionDate($format = 'Y-m-d H:i:s')

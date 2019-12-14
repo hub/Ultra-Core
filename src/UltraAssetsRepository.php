@@ -62,24 +62,22 @@ class UltraAssetsRepository
     }
 
     /**
-     * @return UltraAssetCollection
+     * @return UltraAsset[]
      */
     public function getAllActiveAssets()
     {
         /** @var \mysqli_result $stmt */
         $stmt = $this->dbConnection->query($this->getUltraAssetRetrievalQuery());
-
-        $assetCollection = new UniqueUltraAssetCollection();
         if ($stmt->num_rows === 0) {
-            return $assetCollection;
+            return array();
         }
 
+        $assets = array();
         while ($asset = $stmt->fetch_assoc()) {
-            $asset['num_assets'] = $asset['numAssets'];
-            $assetCollection->addAsset($this->getWeightingEnrichedUltraAsset($asset));
+            $assets[] = $this->getWeightingEnrichedUltraAsset($asset);
         }
 
-        return $assetCollection;
+        return $assets;
     }
 
     /**
@@ -158,7 +156,12 @@ SQL
         $amount = $this->getAssetValue($asset);
         if ($asset->weightingType() !== self::TYPE_CURRENCY_COMBO && count($asset->weightings()) > 0) {
             $weightings = $asset->weightings();
-            $amount = floatval(array_shift($weightings)->currencyAmount());
+            /**
+             * If we are here, this means the weighting type is based on Ven.
+             * Let's divide 1 Ven by the custom Ven amount to get the asset amount.
+             * @see UltraAssetsRepository::$availableWeightingTypes
+             */
+            $amount = 1 / floatval(array_shift($weightings)->currencyAmount());
         }
 
         return new Money($amount, Currency::custom($asset->tickerSymbol()));
@@ -224,81 +227,6 @@ SQL
         }
 
         $asset->setWeightings($assetWeightings);
-    }
-
-    /**
-     * @param UltraAsset $asset
-     *
-     * @return UltraAsset[]
-     */
-    public function getSimilarAssetsForAsset(UltraAsset $asset)
-    {
-        /** @var \mysqli_result $stmt */
-        $stmt = $this->dbConnection->query(<<<SQL
-SELECT
-    *
-FROM ultra_assets
-WHERE
-    `hash` = '{$asset->weightingHash()}'
-    AND is_approved = 1
-ORDER BY RAND()
-SQL
-        );
-
-        $assets = [];
-        while ($row = $stmt->fetch_assoc()) {
-            $assetObj = UltraAssetFactory::fromArray($row);
-            // we can set the same weightings as they are similar in weightings
-            $assetObj->setWeightings($asset->weightings());
-
-            $assets[] = $assetObj;
-        }
-
-        return $assets;
-    }
-
-    /**
-     * returns the quantity to be deducted from assets as per required quantity
-     *
-     * @param UltraAsset $asset
-     * @param int        $requiredQuantity
-     *
-     * @return array [UltraAsset, float][]
-     * @throws InsufficientAssetAvailabilityException
-     */
-    public function getQuantitiesPerSimilarAsset(UltraAsset $asset, $requiredQuantity)
-    {
-        $quantitiesPerAssets = [];
-        $availableAssetAmount = 0;
-        $originalRequiredQuantity = $requiredQuantity;
-
-        foreach ($this->getSimilarAssetsForAsset($asset) as $similarAsset) {
-            $availableAssetAmount += $similarAsset->numAssets();
-            if (!($requiredQuantity > 0)) {
-                continue;
-            }
-
-            $eachAssetQuantity = $similarAsset->numAssets();
-
-            if ($requiredQuantity < $eachAssetQuantity) {
-                $quantity = $requiredQuantity;
-            } else {
-                $quantity = $eachAssetQuantity;
-            }
-
-            $requiredQuantity -= $quantity;
-            $quantitiesPerAssets[] = ['asset' => $similarAsset, 'quantity' => $quantity];
-        }
-
-        if ($requiredQuantity > 0) {
-            throw new InsufficientAssetAvailabilityException(sprintf(
-                'There are no such amount of assets available for your requested amount of %s. Only %s available.',
-                $originalRequiredQuantity,
-                $availableAssetAmount
-            ));
-        }
-
-        return $quantitiesPerAssets;
     }
 
     /**
@@ -510,6 +438,11 @@ SQL
         $this->dbConnection->commit();
     }
 
+    /**
+     * @param array $asset
+     *
+     * @return UltraAsset
+     */
     protected function getWeightingEnrichedUltraAsset(array $asset)
     {
         $assetObj = UltraAssetFactory::fromArray($asset);
@@ -546,15 +479,12 @@ SQL
         $whereStr = implode(' AND ', $where);
         return <<<SQL
 SELECT
-    *,
-    IF (COUNT(`hash`) > 1, 1, 0) AS `isMergedAsset`,
-    SUM(`num_assets`) AS `numAssets`
+    *
 FROM `ultra_assets`
 WHERE
     `is_approved` = 1
     AND `num_assets` > 0
     AND {$whereStr}
-GROUP BY `hash`
 SQL;
     }
 }

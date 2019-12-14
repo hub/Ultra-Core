@@ -20,7 +20,7 @@ class UltraAssetFactory
             $explicitVenAmount = floatval($asset['explicit_ven_amount']);
         }
 
-        $assetObj = new UltraAsset(
+        return new UltraAsset(
             $asset['id'],
             $asset['hash'],
             $asset['title'],
@@ -36,12 +36,6 @@ class UltraAssetFactory
             self::extractAssetWeightings($asset['weightings'], $asset['weighting_type'], $explicitVenAmount),
             $asset['created_at']
         );
-
-        if (isset($asset['isMergedAsset']) && intval($asset['isMergedAsset']) === 1) {
-            $assetObj->markAsMergedAsset();
-        }
-
-        return $assetObj;
     }
 
     /**
