@@ -47,7 +47,7 @@ class UltraCurrencyRatesProvider implements CurrencyRatesProviderInterface
         }
 
         $rates = [];
-        foreach ($ultraAssets->getAssets() as $ultraAsset) {
+        foreach ($ultraAssets as $ultraAsset) {
             $rates[] = new CurrencyRate(
                 $ultraAsset->tickerSymbol(),
                 $this->ultraAssetsRepository->getAssetAmountForOneVen($ultraAsset)->getAmount()

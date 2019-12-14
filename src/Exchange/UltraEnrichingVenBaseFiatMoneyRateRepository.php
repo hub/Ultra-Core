@@ -56,7 +56,7 @@ class UltraEnrichingVenBaseFiatMoneyRateRepository implements BaseFiatMoneyRateR
     {
         $baseExchangeRates = $this->innerExchangeRateRepository->getBaseFiatMoney();
 
-        $assets = $this->ultraAssetsRepository->getAllActiveAssets()->getAssets();
+        $assets = $this->ultraAssetsRepository->getAllActiveAssets();
         foreach ($assets as $asset) {
             // check to see if we have 100% weighting of a base fiat currency on the current Ultra asset.
             // if so, relate to the corresponding fiat currency itself and continue to the next ultra asset.
