@@ -483,7 +483,6 @@ SELECT
 FROM `ultra_assets`
 WHERE
     `is_approved` = 1
-    AND `num_assets` > 0
     AND {$whereStr}
 SQL;
     }
