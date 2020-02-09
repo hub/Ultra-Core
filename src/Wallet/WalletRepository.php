@@ -59,11 +59,37 @@ SQL
                 return null;
             }
 
-            $wallet = new Wallet($preparedStmt->insert_id, $userId, $assetId, $balance, $balance);
+            $wallet = new Wallet($preparedStmt->insert_id, $userId, $assetId, $balance, $balance, $publicKey);
             $this->logger->debug("A new wallet has been created for user [{$userId}] for asset [{$assetId}]");
         }
 
         return $wallet;
+    }
+
+    /**
+     * This return a user ultra wallet by a public wallet identifier.
+     *
+     * @param string $walletPublicKey A valid public key of an ultra asset wallet
+     *
+     * @return Wallet|null
+     */
+    public function getUserWalletByPublicKey($walletPublicKey)
+    {
+        $stmt = $this->dbConnection->prepare(
+            'SELECT `id`, `user_id`, `asset_id`, `balance`, `available_balance` FROM `wallets` WHERE `public_key` = ?'
+        );
+        $stmt->bind_param("s", $walletPublicKey);
+        $executed = $stmt->execute();
+        if (!$executed) {
+            return null;
+        }
+
+        $stmt->bind_result($id, $userId, $assetId, $balance, $availableBalance);
+        while ($stmt->fetch()) {
+            return new Wallet($id, $userId, $assetId, $balance, $availableBalance, $walletPublicKey);
+        }
+
+        return null;
     }
 
     /**
@@ -76,7 +102,7 @@ SQL
     public function getUserWallets($userId)
     {
         $stmt = $this->dbConnection->prepare(
-            'SELECT `id`, `user_id`, `asset_id`, `balance`, `available_balance` FROM `wallets` WHERE `user_id` = ?'
+            'SELECT `id`, `user_id`, `asset_id`, `balance`, `available_balance`, `public_key` FROM `wallets` WHERE `user_id` = ?'
         );
         $stmt->bind_param("i", $userId);
         $executed = $stmt->execute();
@@ -85,9 +111,9 @@ SQL
         }
 
         $wallets = array();
-        $stmt->bind_result($id, $userId, $assetId, $balance, $availableBalance);
+        $stmt->bind_result($id, $userId, $assetId, $balance, $availableBalance, $publicKey);
         while ($stmt->fetch()) {
-            $wallets[] = new Wallet($id, $userId, $assetId, $balance, $availableBalance);
+            $wallets[] = new Wallet($id, $userId, $assetId, $balance, $availableBalance, $publicKey);
         }
 
         return $wallets;
@@ -102,7 +128,7 @@ SQL
     public function getUserWalletOrNull($userId, $assetId)
     {
         $stmt = $this->dbConnection->prepare(
-            'SELECT `id`, `user_id`, `asset_id`, `balance`, `available_balance` FROM `wallets` WHERE `user_id` = ? AND `asset_id` = ?'
+            'SELECT `id`, `user_id`, `asset_id`, `balance`, `available_balance`, `public_key` FROM `wallets` WHERE `user_id` = ? AND `asset_id` = ?'
         );
         $stmt->bind_param("ii", $userId, $assetId);
         $executed = $stmt->execute();
@@ -110,9 +136,9 @@ SQL
             return null;
         }
 
-        $stmt->bind_result($id, $userId, $assetId, $balance, $availableBalance);
+        $stmt->bind_result($id, $userId, $assetId, $balance, $availableBalance, $publicKey);
         while ($stmt->fetch()) {
-            return new Wallet($id, $userId, $assetId, $balance, $availableBalance);
+            return new Wallet($id, $userId, $assetId, $balance, $availableBalance, $publicKey);
         }
 
         return null;

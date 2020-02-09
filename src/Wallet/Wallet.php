@@ -34,21 +34,28 @@ class Wallet
     private $availableBalance;
 
     /**
+     * @var string This is a unique identifier which can be used to identify a wallet.
+     */
+    private $publicKey;
+
+    /**
      * Wallet constructor.
      *
-     * @param int   $id
-     * @param int   $userId
-     * @param int   $assetId
-     * @param float $balance
-     * @param float $availableBalance
+     * @param int    $id
+     * @param int    $userId
+     * @param int    $assetId
+     * @param float  $balance
+     * @param float  $availableBalance
+     * @param string $publicKey Wallet's public key
      */
-    public function __construct($id, $userId, $assetId, $balance, $availableBalance)
+    public function __construct($id, $userId, $assetId, $balance, $availableBalance, $publicKey)
     {
         $this->id = $id;
         $this->userId = $userId;
         $this->assetId = $assetId;
         $this->balance = $balance;
         $this->availableBalance = $availableBalance;
+        $this->publicKey = $publicKey;
     }
 
     /**
@@ -92,6 +99,14 @@ class Wallet
     }
 
     /**
+     * @return string
+     */
+    public function getPublicKey()
+    {
+        return $this->publicKey;
+    }
+
+    /**
      * @return array
      */
     public function toArray()
@@ -102,6 +117,7 @@ class Wallet
             'assetId' => $this->getAssetId(),
             'balance' => $this->getBalance(),
             'availableBalance' => $this->getAvailableBalance(),
+            'publicKey' => $this->getPublicKey(),
         );
     }
 }
