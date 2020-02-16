@@ -8,6 +8,7 @@ namespace Hub\UltraCore;
 
 use Hub\UltraCore\Issuance\AssetIssuerAuthority;
 use Hub\UltraCore\Issuance\IssuerSelectionStrategy;
+use Hub\UltraCore\MatchEngine\Order\OrderRepository;
 use Hub\UltraCore\Money\Currency;
 use Hub\UltraCore\Money\Exchange;
 use Hub\UltraCore\Money\Money;
@@ -15,6 +16,7 @@ use Hub\UltraCore\Ven\UltraVenRepository;
 use Hub\UltraCore\Ven\VenWallet;
 use Hub\UltraCore\Wallet\Wallet;
 use Hub\UltraCore\Wallet\WalletRepository;
+use Mockery\LegacyMockInterface;
 use PHPUnit\Framework\TestCase;
 use Mockery;
 
@@ -114,7 +116,10 @@ class DefaultWalletHandlerTest extends TestCase
             new AssetIssuerAuthority($testAssetIssuerUserId, 100, 100, $testPurchaseAssetAmount)
         ));
 
-        $sut = new DefaultWalletHandler($venRepoMock, $assetRepoMock, $walletRepoMock, $exchangeMock, $selectionStrategyMock);
+        /** @var OrderRepository|LegacyMockInterface $orderRepoMock */
+        $orderRepoMock = Mockery::mock(OrderRepository::class);
+
+        $sut = new DefaultWalletHandler($venRepoMock, $assetRepoMock, $walletRepoMock, $orderRepoMock, $exchangeMock, $selectionStrategyMock);
         $sut->purchase($testAssetBuyerUserId, $assetMock, $testPurchaseAssetAmount);
     }
 
@@ -156,7 +161,10 @@ class DefaultWalletHandlerTest extends TestCase
         // SelectionStrategy
         $selectionStrategyMock = Mockery::mock(IssuerSelectionStrategy::class);
 
-        $sut = new DefaultWalletHandler($venRepoMock, $assetRepoMock, $walletRepoMock, $exchangeMock, $selectionStrategyMock);
+        /** @var OrderRepository|LegacyMockInterface $orderRepoMock */
+        $orderRepoMock = Mockery::mock(OrderRepository::class);
+
+        $sut = new DefaultWalletHandler($venRepoMock, $assetRepoMock, $walletRepoMock, $orderRepoMock, $exchangeMock, $selectionStrategyMock);
         $sut->purchase($testUserId, $assetMock, $testPurchaseAssetAmount);
     }
 
@@ -196,10 +204,13 @@ class DefaultWalletHandlerTest extends TestCase
         // WalletRepository
         $walletRepoMock = Mockery::mock(WalletRepository::class);
 
+        /** @var OrderRepository|LegacyMockInterface $orderRepoMock */
+        $orderRepoMock = Mockery::mock(OrderRepository::class);
+
         // SelectionStrategy
         $selectionStrategyMock = Mockery::mock(IssuerSelectionStrategy::class);
 
-        $sut = new DefaultWalletHandler($venRepoMock, $assetRepoMock, $walletRepoMock, $exchangeMock, $selectionStrategyMock);
+        $sut = new DefaultWalletHandler($venRepoMock, $assetRepoMock, $walletRepoMock, $orderRepoMock, $exchangeMock, $selectionStrategyMock);
         $sut->purchase($testUserId, $assetMock, $testAssetBuyAmount);
     }
 
@@ -288,7 +299,10 @@ class DefaultWalletHandlerTest extends TestCase
             new AssetIssuerAuthority($testAssetIssuerUserId, 100, 100, $testPurchaseAssetAmount)
         ));
 
-        $sut = new DefaultWalletHandler($venRepoMock, $assetRepoMock, $walletRepoMock, $exchangeMock, $selectionStrategyMock);
+        /** @var OrderRepository|LegacyMockInterface $orderRepoMock */
+        $orderRepoMock = Mockery::mock(OrderRepository::class);
+
+        $sut = new DefaultWalletHandler($venRepoMock, $assetRepoMock, $walletRepoMock, $orderRepoMock, $exchangeMock, $selectionStrategyMock);
         $sut->purchase($testAssetBuyerUserId, $assetMock, $testPurchaseAssetAmount);
     }
 }

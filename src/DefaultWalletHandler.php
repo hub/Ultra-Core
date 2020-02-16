@@ -8,6 +8,10 @@ namespace Hub\UltraCore;
 
 use Hub\UltraCore\Issuance\IssuerSelectionStrategy;
 use Hub\UltraCore\Exception\WalletException;
+use Hub\UltraCore\MatchEngine\MachineEngine;
+use Hub\UltraCore\MatchEngine\Order\OrderRepository;
+use Hub\UltraCore\MatchEngine\Order\Orders;
+use Hub\UltraCore\MatchEngine\Order\SellOrder;
 use Hub\UltraCore\Money\Currency;
 use Hub\UltraCore\Money\Exchange;
 use Hub\UltraCore\Money\Money;
@@ -37,6 +41,12 @@ class DefaultWalletHandler implements WalletHandler
     private $walletRepository;
 
     /**
+     * @var OrderRepository
+     */
+    private $orderRepository;
+
+
+    /**
      * @var Exchange
      */
     private $exchange;
@@ -50,6 +60,7 @@ class DefaultWalletHandler implements WalletHandler
      * @param UltraVenRepository      $venRepository
      * @param UltraAssetsRepository   $ultraAssetsRepository
      * @param WalletRepository        $walletRepository
+     * @param OrderRepository         $orderRepository
      * @param Exchange                $exchange
      * @param IssuerSelectionStrategy $assetSelectionStrategy
      */
@@ -57,12 +68,14 @@ class DefaultWalletHandler implements WalletHandler
         UltraVenRepository $venRepository,
         UltraAssetsRepository $ultraAssetsRepository,
         WalletRepository $walletRepository,
+        OrderRepository $orderRepository,
         Exchange $exchange,
         IssuerSelectionStrategy $assetSelectionStrategy
     ) {
         $this->venRepository = $venRepository;
         $this->ultraAssetsRepository = $ultraAssetsRepository;
         $this->walletRepository = $walletRepository;
+        $this->orderRepository = $orderRepository;
         $this->exchange = $exchange;
         $this->assetSelectionStrategy = $assetSelectionStrategy;
     }
@@ -70,7 +83,7 @@ class DefaultWalletHandler implements WalletHandler
     /**
      * Use this function to process an ultra buy action.
      *
-     * @param int        $userId Hub Culture user identifier.
+     * @param int        $userId Hub Culture identifier of the purchasing user.
      * @param UltraAsset $asset
      * @param float      $purchaseAssetAmount
      *
@@ -151,14 +164,16 @@ class DefaultWalletHandler implements WalletHandler
     /**
      * Use this function to process an ultra sell action.
      *
-     * @param int        $userId          Hub Culture user identifier.
-     * @param UltraAsset $asset           Ultra asset created by a user.
-     * @param float      $sellAssetAmount Amount of assets that the user is about to sell.
+     * @param int        $userId                     Hub Culture identifier of the selling user.
+     * @param UltraAsset $asset                      Ultra asset created by a user.
+     * @param float      $sellAssetAmount            Amount of assets that the user is about to sell.
+     * @param float|null $customVenAmountForOneAsset A user can propose a different rate instead using the market rate
+     *                                               when selling an asset.
      *
      * @throws InsufficientUltraAssetBalanceException
      * @throws WalletException
      */
-    public function sell($userId, UltraAsset $asset, $sellAssetAmount)
+    public function sell($userId, UltraAsset $asset, $sellAssetAmount, $customVenAmountForOneAsset = null)
     {
         // let's calculate the asset amount that the seller needs to pay to cover our commission in ven
         $withdrawalFee = UltraAssetsRepository::WITHDRAWAL_VEN_FEE;
@@ -203,11 +218,35 @@ class DefaultWalletHandler implements WalletHandler
         $metaData['weightingConfig'] = $weightingConfig;
         $metaData['hc_withdrawal_fee'] = UltraAssetsRepository::WITHDRAWAL_VEN_FEE;
         $metaData['hc_exchange_fee'] = UltraAssetsRepository::EXCHANGE_PERCENT_FEE;
-        $metaData['commit'] = false; // sell orders are always processed / committed by an admin for now until we integrate Kraken or other exchange.
+        $metaData['commit'] = true; // we can commit this as this is our fee
 
-        $this->walletRepository->debit($wallet, $sellAssetAmount, $metaData);
+        // let's charge the fee first by deducting the asset amount from the seller and transferring to us
+        $sellingFeesInAssetAmount = $assetAmountForWithdrawalFee + $assetAmountForExchangeCommission;
+        $this->walletRepository->debit(
+            $wallet,
+            $sellingFeesInAssetAmount,
+            $metaData
+        );
+        $this->walletRepository->credit(
+            $this->walletRepository->getUserWallet(MachineEngine::SYSTEM_USER_ID, $asset->id()),
+            $sellingFeesInAssetAmount,
+            $metaData
+        );
 
-        // TODO: implement kraken exchange functions to process the transaction immediately
+        // and then we can add this sell order to be processed asynchronously later when matched with a buy order
+        $this->orderRepository->addSellOrder(
+            new SellOrder(
+                0,
+                $userId,
+                $asset->id(),
+                !is_null($customVenAmountForOneAsset) ? $customVenAmountForOneAsset : $venAmountForOneAsset,
+                // the actual selling amount is after deducting our fees
+                $sellAssetAmount - $sellingFeesInAssetAmount,
+                0,
+                Orders::STATUS_PENDING
+            ),
+            $venAmountForOneAsset
+        );
     }
 
     /**

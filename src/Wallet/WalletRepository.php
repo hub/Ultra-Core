@@ -85,7 +85,7 @@ SQL
         }
 
         $stmt->bind_result($id, $userId, $assetId, $balance, $availableBalance);
-        while ($stmt->fetch()) {
+        if ($stmt->fetch()) {
             return new Wallet($id, $userId, $assetId, $balance, $availableBalance, $walletPublicKey);
         }
 
@@ -112,7 +112,7 @@ SQL
 
         $wallets = array();
         $stmt->bind_result($id, $userId, $assetId, $balance, $availableBalance, $publicKey);
-        while ($stmt->fetch()) {
+        if ($stmt->fetch()) {
             $wallets[] = new Wallet($id, $userId, $assetId, $balance, $availableBalance, $publicKey);
         }
 
@@ -137,7 +137,7 @@ SQL
         }
 
         $stmt->bind_result($id, $userId, $assetId, $balance, $availableBalance, $publicKey);
-        while ($stmt->fetch()) {
+        if ($stmt->fetch()) {
             return new Wallet($id, $userId, $assetId, $balance, $availableBalance, $publicKey);
         }
 
@@ -196,9 +196,9 @@ SQL
     }
 
     /**
-     * Use this to retrieve all the tranasactions for all wallets of a given user.
+     * Use this to retrieve all the transactions for all wallets of a given user.
      *
-     * @param int $userId Hub Culture user identifier.
+     * @param int $userId   Hub Culture user identifier.
      * @param int $walletId A valid wallet id belongs to a user.
      * @param int $offset
      * @param int $limit
