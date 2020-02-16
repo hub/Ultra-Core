@@ -31,14 +31,16 @@ interface WalletHandler
     /**
      * Use this function to process an ultra sell action.
      *
-     * @param int        $userId          Hub Culture user identifier.
-     * @param UltraAsset $asset           Ultra asset created by a user.
-     * @param float      $sellAssetAmount Amount of assets that the user is about to sell.
+     * @param int        $userId                     Hub Culture identifier of the selling user.
+     * @param UltraAsset $asset                      Ultra asset created by a user.
+     * @param float      $sellAssetAmount            Amount of assets that the user is about to sell.
+     * @param float|null $customVenAmountForOneAsset A user can propose a different rate instead using the market rate
+     *                                               when selling an asset.
      *
      * @throws InsufficientUltraAssetBalanceException
      * @throws WalletException
      */
-    public function sell($userId, UltraAsset $asset, $sellAssetAmount);
+    public function sell($userId, UltraAsset $asset, $sellAssetAmount, $customVenAmountForOneAsset = null);
 
     /**
      * @param Wallet $senderWallet
