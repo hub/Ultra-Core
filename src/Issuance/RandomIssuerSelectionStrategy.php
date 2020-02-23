@@ -47,12 +47,12 @@ class RandomIssuerSelectionStrategy implements IssuerSelectionStrategy
      * This will randomly selects one authority issuer who has got a remaining quantity greater than the requested
      * quantity.
      *
-     * @param UltraAsset $originalAsset    Main ultra asset to be considered when selecting.
-     * @param float      $requiredQuantity Required asset quantity.
+     * @param int   $originalAssetId  Main ultra asset to be considered when selecting.
+     * @param float $requiredQuantity Required asset quantity.
      *
      * @return AssetIssuerAuthority[] returns an array of authority issuers.
      */
-    public function select(UltraAsset $originalAsset, $requiredQuantity)
+    public function select($originalAssetId, $requiredQuantity)
     {
         $requiredQuantity = floatval($requiredQuantity);
         $stmt = $this->dbConnection->query(<<<SQL
@@ -62,7 +62,7 @@ SELECT
     `remaining_asset_quantity`
 FROM `ultra_asset_issuance_history`
 WHERE
-    `asset_id` = {$originalAsset->id()}
+    `asset_id` = {$originalAssetId}
     AND `remaining_asset_quantity` > {$requiredQuantity}
 ORDER BY RAND()
 LIMIT 1
@@ -81,7 +81,7 @@ SQL
 
         // if none has a remaining quantity of the required amount, we need to get it from another strategy
         if (empty($issuers)) {
-            $issuers = $this->issuerSelectionStrategy->select($originalAsset, $requiredQuantity);
+            $issuers = $this->issuerSelectionStrategy->select($originalAssetId, $requiredQuantity);
         }
 
         return $issuers;

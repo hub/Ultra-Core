@@ -45,12 +45,12 @@ class FirstIssuerFirstServedIssuerSelectionStrategy implements IssuerSelectionSt
      * When a request comes in to require 90 uUSD assets.
      * This function will select 50, 20 & 20 from Authorities A, B & C respectively leaving 10 uUSD from 'Authority C'.
      *
-     * @param UltraAsset $originalAsset    Main ultra asset to be considered when selecting.
-     * @param float      $requiredQuantity Required asset quantity.
+     * @param int   $originalAssetId  Main ultra asset to be considered when selecting.
+     * @param float $requiredQuantity Required asset quantity.
      *
      * @return AssetIssuerAuthority[] returns an array of authority issuers.
      */
-    public function select(UltraAsset $originalAsset, $requiredQuantity)
+    public function select($originalAssetId, $requiredQuantity)
     {
         $requiredQuantity = floatval($requiredQuantity);
         $stmt = $this->dbConnection->query(<<<SQL
@@ -60,7 +60,7 @@ SELECT
     `remaining_asset_quantity`
 FROM `ultra_asset_issuance_history`
 WHERE
-    `asset_id` = {$originalAsset->id()}
+    `asset_id` = {$originalAssetId}
 ORDER BY `id` ASC
 SQL
         );

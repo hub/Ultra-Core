@@ -8,7 +8,9 @@ namespace Hub\UltraCore;
 
 use Hub\UltraCore\Issuance\AssetIssuerAuthority;
 use Hub\UltraCore\Issuance\IssuerSelectionStrategy;
+use Hub\UltraCore\MatchEngine\Order\BuyOrder;
 use Hub\UltraCore\MatchEngine\Order\OrderRepository;
+use Hub\UltraCore\MatchEngine\Order\Orders;
 use Hub\UltraCore\Money\Currency;
 use Hub\UltraCore\Money\Exchange;
 use Hub\UltraCore\Money\Money;
@@ -110,16 +112,30 @@ class DefaultWalletHandlerTest extends TestCase
             )
         );
 
-        // SelectionStrategy
-        $selectionStrategyMock = Mockery::mock(IssuerSelectionStrategy::class);
-        $selectionStrategyMock->shouldReceive('select')->andReturn(array(
-            new AssetIssuerAuthority($testAssetIssuerUserId, 100, 100, $testPurchaseAssetAmount)
-        ));
-
         /** @var OrderRepository|LegacyMockInterface $orderRepoMock */
         $orderRepoMock = Mockery::mock(OrderRepository::class);
+        $orderRepoMock
+            ->shouldReceive('addBuyOrder')
+            ->with(
+                Mockery::on(function (BuyOrder $argument) use (
+                    $testPurchaseAssetAmount,
+                    $testAssetBuyerUserId,
+                    $testVenAmountForOneAsset,
+                    $testAssetId
+                ) {
+                    return $argument->getId() === 0
+                        && $argument->getUserId() === $testAssetBuyerUserId
+                        && $argument->getAssetId() === $testAssetId
+                        && $argument->getOfferingRate() === floatval($testVenAmountForOneAsset)
+                        && $argument->getAmount() === floatval($testPurchaseAssetAmount)
+                        && $argument->getSettledAmountSoFar() === 0.0
+                        && $argument->getStatus() === Orders::STATUS_PENDING
+                    ;
+                }),
+                $testVenAmountForOneAsset
+            );
 
-        $sut = new DefaultWalletHandler($venRepoMock, $assetRepoMock, $walletRepoMock, $orderRepoMock, $exchangeMock, $selectionStrategyMock);
+        $sut = new DefaultWalletHandler($venRepoMock, $assetRepoMock, $walletRepoMock, $orderRepoMock, $exchangeMock);
         $sut->purchase($testAssetBuyerUserId, $assetMock, $testPurchaseAssetAmount);
     }
 
@@ -158,13 +174,11 @@ class DefaultWalletHandlerTest extends TestCase
         // WalletRepository
         $walletRepoMock = Mockery::mock(WalletRepository::class);
 
-        // SelectionStrategy
-        $selectionStrategyMock = Mockery::mock(IssuerSelectionStrategy::class);
-
         /** @var OrderRepository|LegacyMockInterface $orderRepoMock */
         $orderRepoMock = Mockery::mock(OrderRepository::class);
+        $orderRepoMock->shouldReceive('addBuyOrder')->never();
 
-        $sut = new DefaultWalletHandler($venRepoMock, $assetRepoMock, $walletRepoMock, $orderRepoMock, $exchangeMock, $selectionStrategyMock);
+        $sut = new DefaultWalletHandler($venRepoMock, $assetRepoMock, $walletRepoMock, $orderRepoMock, $exchangeMock);
         $sut->purchase($testUserId, $assetMock, $testPurchaseAssetAmount);
     }
 
@@ -206,11 +220,9 @@ class DefaultWalletHandlerTest extends TestCase
 
         /** @var OrderRepository|LegacyMockInterface $orderRepoMock */
         $orderRepoMock = Mockery::mock(OrderRepository::class);
+        $orderRepoMock->shouldReceive('addBuyOrder')->never();
 
-        // SelectionStrategy
-        $selectionStrategyMock = Mockery::mock(IssuerSelectionStrategy::class);
-
-        $sut = new DefaultWalletHandler($venRepoMock, $assetRepoMock, $walletRepoMock, $orderRepoMock, $exchangeMock, $selectionStrategyMock);
+        $sut = new DefaultWalletHandler($venRepoMock, $assetRepoMock, $walletRepoMock, $orderRepoMock, $exchangeMock);
         $sut->purchase($testUserId, $assetMock, $testAssetBuyAmount);
     }
 
@@ -293,16 +305,30 @@ class DefaultWalletHandlerTest extends TestCase
             )
         );
 
-        // SelectionStrategy
-        $selectionStrategyMock = Mockery::mock(IssuerSelectionStrategy::class);
-        $selectionStrategyMock->shouldReceive('select')->andReturn(array(
-            new AssetIssuerAuthority($testAssetIssuerUserId, 100, 100, $testPurchaseAssetAmount)
-        ));
-
         /** @var OrderRepository|LegacyMockInterface $orderRepoMock */
         $orderRepoMock = Mockery::mock(OrderRepository::class);
+        $orderRepoMock
+            ->shouldReceive('addBuyOrder')
+            ->with(
+                Mockery::on(function (BuyOrder $argument) use (
+                    $testPurchaseAssetAmount,
+                    $testAssetBuyerUserId,
+                    $testVenAmountForOneAsset,
+                    $testAssetId
+                ) {
+                    return $argument->getId() === 0
+                        && $argument->getUserId() === $testAssetBuyerUserId
+                        && $argument->getAssetId() === $testAssetId
+                        && $argument->getOfferingRate() === floatval($testVenAmountForOneAsset)
+                        && $argument->getAmount() === floatval($testPurchaseAssetAmount)
+                        && $argument->getSettledAmountSoFar() === 0.0
+                        && $argument->getStatus() === Orders::STATUS_PENDING
+                        ;
+                }),
+                $testVenAmountForOneAsset
+            );
 
-        $sut = new DefaultWalletHandler($venRepoMock, $assetRepoMock, $walletRepoMock, $orderRepoMock, $exchangeMock, $selectionStrategyMock);
+        $sut = new DefaultWalletHandler($venRepoMock, $assetRepoMock, $walletRepoMock, $orderRepoMock, $exchangeMock);
         $sut->purchase($testAssetBuyerUserId, $assetMock, $testPurchaseAssetAmount);
     }
 }

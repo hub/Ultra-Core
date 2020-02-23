@@ -5,12 +5,13 @@
 
 namespace Hub\UltraCore\MatchEngine;
 
+use Hub\UltraCore\MatchEngine\Order\MatchedOrderPair;
 use Hub\UltraCore\MatchEngine\Order\OrderRepository;
 use Hub\UltraCore\Ven\UltraVenRepository;
 use Hub\UltraCore\Wallet\WalletRepository;
 use Psr\Log\LoggerInterface;
 
-class MachineEngine
+class MatchEngine
 {
     const SYSTEM_USER_ID = 1;
 
@@ -35,6 +36,11 @@ class MachineEngine
     private $venRepository;
 
     /**
+     * @var BuyerIssuerMatcher
+     */
+    private $buyerIssuerMatcher;
+
+    /**
      * @var LoggerInterface
      */
     private $logger;
@@ -46,6 +52,7 @@ class MachineEngine
      * @param OrderRepository     $orderRepository
      * @param WalletRepository    $walletRepository
      * @param UltraVenRepository  $venRepository
+     * @param BuyerIssuerMatcher  $buyerIssuerMatcher
      * @param LoggerInterface     $logger
      */
     public function __construct(
@@ -53,12 +60,14 @@ class MachineEngine
         OrderRepository $orderRepository,
         WalletRepository $walletRepository,
         UltraVenRepository $venRepository,
+        BuyerIssuerMatcher $buyerIssuerMatcher,
         LoggerInterface $logger
     ) {
         $this->tradingOrderMatcher = $tradingOrderMatcher;
         $this->orderRepository = $orderRepository;
         $this->walletRepository = $walletRepository;
         $this->venRepository = $venRepository;
+        $this->buyerIssuerMatcher = $buyerIssuerMatcher;
         $this->logger = $logger;
     }
 
@@ -73,16 +82,30 @@ class MachineEngine
         $settledOrderPairs = $this->orderRepository->getSettledOrderPairsLoggedAfterId($lastSettlementId);
         $this->logger->debug(sprintf("Found '%d' new settled order pairs.", count($settledOrderPairs)), [__CLASS__]);
 
+        $this->settleMatchedOrders($settledOrderPairs);
+
+        /**
+         * Time to settle buy orders which we couldn't process/settle solely by matching sell orders.
+         * This is the requirement that I received from product owner Stan.
+         */
+        $this->buyerIssuerMatcher->execute();
+    }
+
+    /**
+     * @param MatchedOrderPair[] $settledOrderPairs
+     */
+    private function settleMatchedOrders(array $settledOrderPairs)
+    {
         foreach ($settledOrderPairs as $orderPair) {
             $buyOrder = $orderPair->getBuyOrder();
             $sellOrder = $orderPair->getSellOrder();
 
             $buyerAssetWallet = $this->walletRepository->getUserWallet(
-                $buyOrder->getBuyerUserId(),
+                $buyOrder->getUserId(),
                 $buyOrder->getAssetId()
             );
             $sellerAssetWallet = $this->walletRepository->getUserWallet(
-                $sellOrder->getSellerUserId(),
+                $sellOrder->getUserId(),
                 $sellOrder->getAssetId()
             );
 
@@ -108,8 +131,8 @@ class MachineEngine
 
             // let's send ven from the buyer to the seller as we settle this order in terms of Ven
             $this->venRepository->sendVen(
-                $buyOrder->getBuyerUserId(),
-                $sellOrder->getSellerUserId(),
+                $buyOrder->getUserId(),
+                $sellOrder->getUserId(),
                 $sellerTotalGainInVen,
                 'An order placed on the ULTRA exchange'
             );
@@ -119,12 +142,11 @@ class MachineEngine
              * we have found a buyer who is willing to buy paying more than the seller's offered rate.
              *
              * This means there is a profit under the carpet that we/system/hub culture can keep.
-             * And there is no harm here.
              */
             $sellerProfitInVen = $buyerTotalPayInVen - ($sellerOfferingRateInVen * $orderPair->getSettledAmount());
             if ($sellerProfitInVen > 0) {
                 $this->venRepository->sendVen(
-                    $sellOrder->getSellerUserId(),
+                    $sellOrder->getUserId(),
                     self::SYSTEM_USER_ID,
                     $sellerProfitInVen,
                     sprintf(
@@ -133,6 +155,9 @@ class MachineEngine
                         $sellOrder->getId()
                     ),
                     true
+                );
+                $this->logger->debug(
+                    "Transferred '{$sellerProfitInVen} Ven' to the HubCulture system account as a profit.", [__CLASS__]
                 );
             }
         }

@@ -8,7 +8,6 @@ namespace Hub\UltraCore;
 
 use Hub\UltraCore\Money\Currency;
 use Hub\UltraCore\Money\Money;
-use Hub\UltraCore\Exception\InsufficientAssetAvailabilityException;
 use Exception;
 use mysqli;
 

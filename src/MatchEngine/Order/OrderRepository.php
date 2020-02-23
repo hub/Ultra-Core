@@ -51,7 +51,7 @@ class OrderRepository
             $this->database->insert(
                 'ultra_custom_buy_sell_orders',
                 [
-                    'user_id' => $sellOrder->getSellerUserId(),
+                    'user_id' => $sellOrder->getUserId(),
                     'asset_id' => $sellOrder->getAssetId(),
                     'type' => Orders::TYPE_SELL,
                     'status' => $sellOrder->getStatus(),
@@ -87,9 +87,9 @@ class OrderRepository
             $this->database->insert(
                 'ultra_custom_buy_sell_orders',
                 [
-                    'user_id' => $buyOrder->getBuyerUserId(),
+                    'user_id' => $buyOrder->getUserId(),
                     'asset_id' => $buyOrder->getAssetId(),
-                    'type' => Orders::TYPE_SELL,
+                    'type' => Orders::TYPE_PURCHASE,
                     'status' => $buyOrder->getStatus(),
                     'transaction_currency' => UltraAssetsRepository::CURRENCY_CODE_VEN_LABEL,
                     'offering_rate' => $buyOrder->getOfferingRate(),
@@ -134,7 +134,8 @@ class OrderRepository
                         $order['offering_rate'],
                         $order['asset_amount'],
                         $order['settled_amount_so_far'],
-                        $order['status']
+                        $order['status'],
+                        $order['num_match_attempts']
                     );
                 } elseif ($order['type'] === Orders::TYPE_SELL) {
                     $sellOrders[] = new SellOrder(
@@ -144,7 +145,8 @@ class OrderRepository
                         $order['offering_rate'],
                         $order['asset_amount'],
                         $order['settled_amount_so_far'],
-                        $order['status']
+                        $order['status'],
+                        $order['num_match_attempts']
                     );
                 }
             } catch (InvalidArgumentException $ex) {
@@ -159,6 +161,8 @@ class OrderRepository
      * Use this to update the status of any order which has been settled
      *
      * @param Orders $orders
+     *
+     * @throws DBALException
      */
     public function updateOrders(Orders $orders)
     {
@@ -208,11 +212,43 @@ class OrderRepository
     }
 
     /**
+     * Use this to reject an order with a reason
+     *
+     * @param int    $orderId Order that you need to reject
+     * @param string $notes
+     */
+    public function rejectOrder($orderId, $notes = '')
+    {
+        if (intval($orderId) === 0) {
+            return;
+        }
+
+        try {
+            $this->database->update(
+                'ultra_custom_buy_sell_orders',
+                [
+                    'status' => Orders::STATUS_REJECTED,
+                    'notes' => $notes,
+                ],
+                ['id' => $orderId],
+                ['status' => PDO::PARAM_STR, 'notes' => PDO::PARAM_STR]
+            );
+        } catch (DBALException $e) {
+            $this->logger->error(sprintf(
+                'Error occurred when increment the match attempt for order [%d]. Error : %s', $orderId,
+                $e->getMessage()
+            ));
+        }
+    }
+
+    /**
      * Use this to record a settlement for a order pair.
      *
      * @param int   $mainOrderId    Main order id which we are settling
      * @param int   $matchedOrderId The matched order id
      * @param float $settleAmount   The amount being settled for the given main order id
+     *
+     * @throws DBALException
      */
     public function addSettlement($mainOrderId, $matchedOrderId, $settleAmount)
     {
@@ -267,6 +303,7 @@ SELECT
     o.asset_amount AS `main_order_asset_amount`,
     o.settled_amount_so_far AS `main_order_settled_amount_so_far`,
     o.status AS `main_order_status`,
+    o.num_match_attempts AS `main_order_num_match_attempts`,
     o2.id AS `matched_order_id`,
     o2.user_id AS `matched_order_user_id`,
     o2.asset_id AS `matched_order_asset_id`,
@@ -275,6 +312,7 @@ SELECT
     o2.asset_amount AS `matched_order_asset_amount`,
     o2.settled_amount_so_far AS `matched_order_settled_amount_so_far`,
     o2.status AS `matched_order_status`,
+    o2.num_match_attempts AS `matched_order_num_match_attempts`,
     s.asset_amount AS `settled_amount`
 FROM `ultra_custom_buy_sell_order_settlements` s
 INNER JOIN ultra_custom_buy_sell_orders o ON (o.id = s.order_id)
@@ -301,7 +339,8 @@ SQL
                     $row['main_order_offering_rate'],
                     $row['main_order_asset_amount'],
                     $row['main_order_settled_amount_so_far'],
-                    $row['main_order_status']
+                    $row['main_order_status'],
+                    $row['main_order_num_match_attempts']
                 );
             } elseif ($row['main_order_type'] === Orders::TYPE_SELL) {
                 $sellOrder = new SellOrder(
@@ -311,7 +350,8 @@ SQL
                     $row['main_order_offering_rate'],
                     $row['main_order_asset_amount'],
                     $row['main_order_settled_amount_so_far'],
-                    $row['main_order_status']
+                    $row['main_order_status'],
+                    $row['main_order_num_match_attempts']
                 );
             }
             if ($row['matched_order_type'] === Orders::TYPE_PURCHASE) {
@@ -322,7 +362,8 @@ SQL
                     $row['matched_order_offering_rate'],
                     $row['matched_order_asset_amount'],
                     $row['matched_order_settled_amount_so_far'],
-                    $row['matched_order_status']
+                    $row['matched_order_status'],
+                    $row['matched_order_num_match_attempts']
                 );
             } elseif ($row['matched_order_type'] === Orders::TYPE_SELL) {
                 $sellOrder = new SellOrder(
@@ -332,7 +373,8 @@ SQL
                     $row['matched_order_offering_rate'],
                     $row['matched_order_asset_amount'],
                     $row['matched_order_settled_amount_so_far'],
-                    $row['matched_order_status']
+                    $row['matched_order_status'],
+                    $row['matched_order_num_match_attempts']
                 );
             }
 

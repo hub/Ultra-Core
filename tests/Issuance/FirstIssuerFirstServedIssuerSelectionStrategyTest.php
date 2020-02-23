@@ -29,11 +29,10 @@ class FirstIssuerFirstServedIssuerSelectionStrategyTest extends TestCase
         array $testUltraIssuanceRecords,
         array $expectedIssuers
     ) {
-        $ultraAssetMock = Mockery::mock('\Hub\UltraCore\UltraAsset');
-        $ultraAssetMock->shouldReceive('id')->once()->andReturn(1);
+        $testUltraAssetId = 1;
 
         $sut = new FirstIssuerFirstServedIssuerSelectionStrategy($this->getMySqlMock($testUltraIssuanceRecords));
-        $issuers = $sut->select($ultraAssetMock, self::TEST_BUY_AMOUNT);
+        $issuers = $sut->select($testUltraAssetId, self::TEST_BUY_AMOUNT);
 
         $this->assertEquals($expectedIssuers, $issuers);
     }

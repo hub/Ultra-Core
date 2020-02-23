@@ -6,9 +6,9 @@
 
 namespace Hub\UltraCore;
 
-use Hub\UltraCore\Issuance\IssuerSelectionStrategy;
 use Hub\UltraCore\Exception\WalletException;
-use Hub\UltraCore\MatchEngine\MachineEngine;
+use Hub\UltraCore\MatchEngine\MatchEngine;
+use Hub\UltraCore\MatchEngine\Order\BuyOrder;
 use Hub\UltraCore\MatchEngine\Order\OrderRepository;
 use Hub\UltraCore\MatchEngine\Order\Orders;
 use Hub\UltraCore\MatchEngine\Order\SellOrder;
@@ -52,46 +52,41 @@ class DefaultWalletHandler implements WalletHandler
     private $exchange;
 
     /**
-     * @var IssuerSelectionStrategy
-     */
-    private $assetSelectionStrategy;
-
-    /**
-     * @param UltraVenRepository      $venRepository
-     * @param UltraAssetsRepository   $ultraAssetsRepository
-     * @param WalletRepository        $walletRepository
-     * @param OrderRepository         $orderRepository
-     * @param Exchange                $exchange
-     * @param IssuerSelectionStrategy $assetSelectionStrategy
+     * @param UltraVenRepository    $venRepository
+     * @param UltraAssetsRepository $ultraAssetsRepository
+     * @param WalletRepository      $walletRepository
+     * @param OrderRepository       $orderRepository
+     * @param Exchange              $exchange
      */
     public function __construct(
         UltraVenRepository $venRepository,
         UltraAssetsRepository $ultraAssetsRepository,
         WalletRepository $walletRepository,
         OrderRepository $orderRepository,
-        Exchange $exchange,
-        IssuerSelectionStrategy $assetSelectionStrategy
+        Exchange $exchange
     ) {
         $this->venRepository = $venRepository;
         $this->ultraAssetsRepository = $ultraAssetsRepository;
         $this->walletRepository = $walletRepository;
         $this->orderRepository = $orderRepository;
         $this->exchange = $exchange;
-        $this->assetSelectionStrategy = $assetSelectionStrategy;
     }
 
     /**
      * Use this function to process an ultra buy action.
      *
-     * @param int        $userId Hub Culture identifier of the purchasing user.
+     * @param int        $userId                     Hub Culture identifier of the purchasing user.
      * @param UltraAsset $asset
      * @param float      $purchaseAssetAmount
+     * @param float|null $customVenAmountForOneAsset A user can propose a different rate instead using the market rate
+     *                                               when buying an asset. The buyer is willing to pay this much in Ven
+     *                                               for one ULTRA asset.
      *
      * @throws InsufficientVenBalanceException
      * @throws InsufficientAssetAvailabilityException
      * @throws WalletException
      */
-    public function purchase($userId, UltraAsset $asset, $purchaseAssetAmount)
+    public function purchase($userId, UltraAsset $asset, $purchaseAssetAmount, $customVenAmountForOneAsset = null)
     {
         if (floatval($purchaseAssetAmount) <= 0.0) {
             throw new WalletException("Purchase amount must be greater than zero(0)");
@@ -124,41 +119,19 @@ class DefaultWalletHandler implements WalletHandler
             ));
         }
 
-        $weightingConfig = [];
-        $weightings = $asset->weightings();
-        array_walk($weightings, function (UltraAssetWeighting $weighting) use (&$weightingConfig) {
-            $weightingConfig[] = $weighting->toArray();
-        });
-
-        $metaData = [];
-        $metaData['asset_amount_in_ven'] = $totalVenAmountForAssets;
-        $metaData['asset_amount_for_one_ven'] = $this->exchange
-            ->convertFromVenToOther(new Money(1, Currency::VEN()), $asset->getCurrency())
-            ->getAmountAsString();
-        $metaData['ven_amount_for_one_asset'] = $venAmountForOneAsset;
-        $metaData['weightingConfig'] = $weightingConfig;
-        $metaData['commit'] = true;
-
-        $wallet = $this->walletRepository->getUserWallet($userId, $asset->id());
-
-        $this->walletRepository->credit($wallet, $purchaseAssetAmount, $metaData);
-
-        // deduct the number of available assets now as we credited some for a user's wallet.
-        $this->ultraAssetsRepository->deductTotalAssetQuantityBy($asset->id(), $purchaseAssetAmount);
-
-        $issuers = $this->assetSelectionStrategy->select($asset, $purchaseAssetAmount);
-        foreach ($issuers as $issuer) {
-            $this->ultraAssetsRepository->deductAssetQuantityBy($issuer->getAuthorityUserId(), $asset->id(),
-                $issuer->getSaleableAssetQuantity());
-            // reduce the amount paid in VEN from the user's VEN account and credit it to the each asset issuer account.
-            $venMessage = "Purchased an amount of {$issuer->getSaleableAssetQuantity()} {$asset->title()} assets @{$venAmountForOneAsset} VEN per 1 {$asset->title()}. Click <a href='/markets/my-wallets/transactions?id={$wallet->getId()}'>here</a> for more info.";
-            $this->venRepository->sendVen(
+        // and then we can add this sell order to be processed asynchronously later when matched with a buy order
+        $this->orderRepository->addBuyOrder(
+            new BuyOrder(
+                0,
                 $userId,
-                $issuer->getAuthorityUserId(),
-                ($venAmountForOneAsset * $issuer->getSaleableAssetQuantity()),
-                $venMessage
-            );
-        }
+                $asset->id(),
+                !is_null($customVenAmountForOneAsset) ? $customVenAmountForOneAsset : $venAmountForOneAsset,
+                $purchaseAssetAmount,
+                0,
+                Orders::STATUS_PENDING
+            ),
+            $venAmountForOneAsset
+        );
     }
 
     /**
@@ -228,7 +201,7 @@ class DefaultWalletHandler implements WalletHandler
             $metaData
         );
         $this->walletRepository->credit(
-            $this->walletRepository->getUserWallet(MachineEngine::SYSTEM_USER_ID, $asset->id()),
+            $this->walletRepository->getUserWallet(MatchEngine::SYSTEM_USER_ID, $asset->id()),
             $sellingFeesInAssetAmount,
             $metaData
         );
