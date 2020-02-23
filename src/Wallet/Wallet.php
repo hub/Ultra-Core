@@ -41,12 +41,13 @@ class Wallet
     /**
      * Wallet constructor.
      *
-     * @param int    $id
-     * @param int    $userId
-     * @param int    $assetId
-     * @param float  $balance
-     * @param float  $availableBalance
-     * @param string $publicKey Wallet's public key
+     * @param int    $id               Wallet identifier
+     * @param int    $userId           Identifier of the user this wallet belongs to
+     * @param int    $assetId          Identifier of the wallet's asset / currency
+     * @param float  $balance          wallet balance
+     * @param float  $availableBalance Available balance after any pending transaction which is the real balance
+     * @param string $publicKey        Wallet's public key. This is another identifier of the wallet which can be used
+     *                                 publicly.
      */
     public function __construct($id, $userId, $assetId, $balance, $availableBalance, $publicKey)
     {

@@ -132,6 +132,6 @@ class UltraAssetsRepositoryTest extends TestCase
         $assetMock->shouldReceive('weightings')->once()->andReturn($testWeightingsConfig);
 
         $actualAssetValue = $this->sut->getAssetAmountForOneVen($assetMock);
-        $this->assertSame(13.0, $actualAssetValue->getAmount());
+        $this->assertSame(1 / 13.0 /* 0.07674597083653109 */, $actualAssetValue->getAmount());
     }
 }

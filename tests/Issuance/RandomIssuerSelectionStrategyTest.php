@@ -20,15 +20,14 @@ class RandomIssuerSelectionStrategyTest extends TestCase
     public function shouldUseTheInnerStrategyWhenWeDoNotHaveOneIssuerWhoCanSupplyTheRequestedQuantity()
     {
         $expectedIssuers = array(array('expected'), array('issuers'));
-        $ultraAssetMock = Mockery::mock('\Hub\UltraCore\UltraAsset');
-        $ultraAssetMock->shouldReceive('id')->once()->andReturn(1);
+        $testUltraAssetId = 1;
         $issuerSelectionStrategyMock = Mockery::mock('\Hub\UltraCore\Issuance\FirstIssuerFirstServedIssuerSelectionStrategy');
         $issuerSelectionStrategyMock->expects('select')
             ->once()
             ->andReturn($expectedIssuers);
 
         $sut = new RandomIssuerSelectionStrategy($this->getMySqlMockWhichReturnNoData(), $issuerSelectionStrategyMock);
-        $issuers = $sut->select($ultraAssetMock, self::TEST_BUY_AMOUNT);
+        $issuers = $sut->select($testUltraAssetId, self::TEST_BUY_AMOUNT);
 
         $this->assertEquals($expectedIssuers, $issuers);
     }
