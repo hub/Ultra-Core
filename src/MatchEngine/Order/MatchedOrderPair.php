@@ -18,16 +18,16 @@ class MatchedOrderPair
     private $sellOrder;
 
     /**
-     * @var float
+     * @var float Amount of assets settled for this matched pair
      */
     private $settledAmount;
 
     /**
      * MatchedOrderPair constructor.
      *
-     * @param BuyOrder  $buyOrder
-     * @param SellOrder $sellOrder
-     * @param float     $settledAmount
+     * @param BuyOrder  $buyOrder      The matched buy order
+     * @param SellOrder $sellOrder     The matched sell order
+     * @param float     $settledAmount Amount of assets settled for this matched pair
      */
     public function __construct(BuyOrder $buyOrder, SellOrder $sellOrder, $settledAmount)
     {
@@ -53,7 +53,9 @@ class MatchedOrderPair
     }
 
     /**
-     * @return float
+     * Returns the amount of assets settled for this matched pair.
+     *
+     * @return float Amount of assets settled
      */
     public function getSettledAmount()
     {

@@ -17,7 +17,7 @@ class Orders
      * This is the threshold where we give up matching sell order and settle using an issuer.
      * This is a scenario where we don't have any sellers selling assets for buyers' demand.
      */
-    const MAX_MATCH_ATTEMPTS_PER_BUY_ORDER = 2;
+    const MAX_MATCH_ATTEMPTS_PER_BUY_ORDER = 3;
 
     /**
      * @var BuyOrder[]

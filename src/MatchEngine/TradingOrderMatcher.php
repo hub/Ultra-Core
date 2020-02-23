@@ -42,7 +42,7 @@ class TradingOrderMatcher
      */
     public function match()
     {
-        $orders = $this->orderRepository->getOrders();
+        $orders = $this->orderRepository->getPendingOrders();
         $buyOrders = $orders->getBuyOrders();
         $sellOrders = $orders->getSellOrders();
 

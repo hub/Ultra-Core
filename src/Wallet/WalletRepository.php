@@ -7,6 +7,8 @@
 namespace Hub\UltraCore\Wallet;
 
 use Hub\UltraCore\Exception\WalletException;
+use Hub\UltraCore\MatchEngine\MatchedOrderMetaData;
+use Hub\UltraCore\MatchEngine\Order\Orders;
 use mysqli;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -56,11 +58,13 @@ SQL
             $preparedStmt->bind_param('iiis', $userId, $assetId, $balance, $publicKey);
             $executed = $preparedStmt->execute();
             if (!$executed) {
+                $preparedStmt->close();
                 return null;
             }
 
             $wallet = new Wallet($preparedStmt->insert_id, $userId, $assetId, $balance, $balance, $publicKey);
             $this->logger->debug("A new wallet has been created for user [{$userId}] for asset [{$assetId}]");
+            $preparedStmt->close();
         }
 
         return $wallet;
@@ -81,11 +85,13 @@ SQL
         $stmt->bind_param("s", $walletPublicKey);
         $executed = $stmt->execute();
         if (!$executed) {
+            $stmt->close();
             return null;
         }
 
         $stmt->bind_result($id, $userId, $assetId, $balance, $availableBalance);
         if ($stmt->fetch()) {
+            $stmt->close();
             return new Wallet($id, $userId, $assetId, $balance, $availableBalance, $walletPublicKey);
         }
 
@@ -107,6 +113,7 @@ SQL
         $stmt->bind_param("i", $userId);
         $executed = $stmt->execute();
         if (!$executed) {
+            $stmt->close();
             return array();
         }
 
@@ -115,6 +122,7 @@ SQL
         if ($stmt->fetch()) {
             $wallets[] = new Wallet($id, $userId, $assetId, $balance, $availableBalance, $publicKey);
         }
+        $stmt->close();
 
         return $wallets;
     }
@@ -133,11 +141,13 @@ SQL
         $stmt->bind_param("ii", $userId, $assetId);
         $executed = $stmt->execute();
         if (!$executed) {
+            $stmt->close();
             return null;
         }
 
         $stmt->bind_result($id, $userId, $assetId, $balance, $availableBalance, $publicKey);
         if ($stmt->fetch()) {
+            $stmt->close();
             return new Wallet($id, $userId, $assetId, $balance, $availableBalance, $publicKey);
         }
 
@@ -257,6 +267,7 @@ SQL
      */
     public function credit(Wallet $wallet, $amount, array $metaData)
     {
+        $this->logger->debug(sprintf('Crediting / Adding [%s] to the wallet %d', $amount, $wallet->getId()));
         $balance = $wallet->getBalance();
         if (!$this->isPendingTransaction($metaData)) {
             $balance = $wallet->getBalance() + $amount;
@@ -273,6 +284,7 @@ SQL
         }
         $preparedStmt->bind_param('ddii', $balance, $availableBalance, $userId, $assetId);
         $updated = $preparedStmt->execute();
+        $preparedStmt->close();
         $transactionLogged = false;
         if ($updated) {
             $transactionLogged = $this->logTransaction($wallet, $amount, $balance, $metaData);
@@ -294,6 +306,7 @@ SQL
      */
     public function debit(Wallet $wallet, $amount, array $metaData)
     {
+        $this->logger->debug(sprintf('Debiting / Deducting [%s] from the wallet %d', $amount, $wallet->getId()));
         $balance = $wallet->getBalance();
         if (!$this->isPendingTransaction($metaData)) {
             $balance = $wallet->getBalance() - $amount;
@@ -310,6 +323,7 @@ SQL
         }
         $preparedStmt->bind_param('ddii', $balance, $availableBalance, $userId, $assetId);
         $updated = $preparedStmt->execute();
+        $preparedStmt->close();
         $transactionLogged = false;
         if ($updated) {
             $transactionLogged = $this->logTransaction($wallet, $amount * -1, $balance, $metaData);
@@ -337,10 +351,11 @@ SQL
         $userId = $wallet->getUserId();
         $walletId = $wallet->getId();
         $assetAmount = $amount;
-        $isCommitted = (!$this->isPendingTransaction($metaData)) ? 1 : 0;
-        $assetAmount_in_ven = !empty($metaData['asset_amount_in_ven']) ? $metaData['asset_amount_in_ven'] : 0;
+        $isCommitted = $this->isPendingTransaction($metaData) ? 0 : 1;
+        $commitOutcome = $this->isPendingTransaction($metaData) ? Orders::STATUS_PENDING : Orders::STATUS_PROCESSED;
+        $assetAmount_in_ven = !empty($metaData[MatchedOrderMetaData::ASSET_AMOUNT_IN_VEN]) ? $metaData[MatchedOrderMetaData::ASSET_AMOUNT_IN_VEN] : 0;
         $assetAmount_for_one_ven = !empty($metaData['asset_amount_for_one_ven']) ? $metaData['asset_amount_for_one_ven'] : 0;
-        $venAmountForOneAsset = !empty($metaData['ven_amount_for_one_asset']) ? $metaData['ven_amount_for_one_asset'] : 0;
+        $venAmountForOneAsset = !empty($metaData[MatchedOrderMetaData::VEN_AMOUNT_FOR_ONE_ASSET]) ? $metaData[MatchedOrderMetaData::VEN_AMOUNT_FOR_ONE_ASSET] : 0;
         $assetWeightingConfig = !empty($metaData['weightingConfig']) ? json_encode($metaData['weightingConfig']) : '[]';
         $isTransfer = isset($metaData['is_transfer']) ? 1 : 0;
         $transferMessage = !empty($metaData['transfer_message']) ? $metaData['transfer_message'] : '';
@@ -353,12 +368,12 @@ SQL
 INSERT INTO `wallet_transactions` (
     `user_id`, `wallet_id`, `balance`, `asset_amount`, `is_committed`, `asset_amount_in_ven`, `asset_amount_for_one_ven`,
     `ven_amount_for_one_asset`, `asset_weighting_config`, `is_transfer`, `transfer_message`, `transfer_related_user`,
-    `asset_amount_for_withdrawal_fee`, `asset_amount_for_exchange_fee`, `meta_data`,
-    `created_at`
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+    `asset_amount_for_withdrawal_fee`, `asset_amount_for_exchange_fee`, `meta_data`, `commit_outcome`,
+    `updated_at`, `created_at`
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
 SQL
         );
-        $preparedStmt->bind_param('iiddidddsisssss',
+        $preparedStmt->bind_param('iiddidddsissssss',
             $userId,
             $walletId,
             $balance,
@@ -373,10 +388,13 @@ SQL
             $transferRelatedUser,
             $assetAmountForWithdrawalFee,
             $assetAmountForExchangeCommission,
-            $metaDataEncoded
+            $metaDataEncoded,
+            $commitOutcome
         );
 
-        return $preparedStmt->execute();
+        $executed = $preparedStmt->execute();
+        $preparedStmt->close();
+        return $executed;
     }
 
     /**

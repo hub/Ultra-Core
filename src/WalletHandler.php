@@ -18,15 +18,16 @@ interface WalletHandler
     /**
      * Use this function to process an ultra buy action.
      *
-     * @param int        $userId Hub Culture user identifier.
+     * @param int        $userId                     Hub Culture user identifier.
      * @param UltraAsset $asset
      * @param float      $purchaseAssetAmount
+     * @param float      $customVenAmountForOneAsset A user can propose a different rate instead using the market rate
+     *                                               when buying an asset. The buyer is willing to pay this much in Ven
+     *                                               for one ULTRA asset.
      *
-     * @throws InsufficientVenBalanceException
-     * @throws InsufficientAssetAvailabilityException
-     * @throws WalletException
+     * @return
      */
-    public function purchase($userId, UltraAsset $asset, $purchaseAssetAmount);
+    public function purchase($userId, UltraAsset $asset, $purchaseAssetAmount, $customVenAmountForOneAsset = 0.0);
 
     /**
      * Use this function to process an ultra sell action.
@@ -34,13 +35,13 @@ interface WalletHandler
      * @param int        $userId                     Hub Culture identifier of the selling user.
      * @param UltraAsset $asset                      Ultra asset created by a user.
      * @param float      $sellAssetAmount            Amount of assets that the user is about to sell.
-     * @param float|null $customVenAmountForOneAsset A user can propose a different rate instead using the market rate
+     * @param float      $customVenAmountForOneAsset A user can propose a different rate instead using the market rate
      *                                               when selling an asset.
      *
      * @throws InsufficientUltraAssetBalanceException
      * @throws WalletException
      */
-    public function sell($userId, UltraAsset $asset, $sellAssetAmount, $customVenAmountForOneAsset = null);
+    public function sell($userId, UltraAsset $asset, $sellAssetAmount, $customVenAmountForOneAsset = 0.0);
 
     /**
      * @param Wallet $senderWallet

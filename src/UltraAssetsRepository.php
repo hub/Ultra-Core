@@ -339,6 +339,7 @@ SQL
             return true;
         }
         $stmt->free_result();
+        $stmt->close();
 
         $this->dbConnection->begin_transaction();
         $stmt = $this->dbConnection->prepare(<<<SQL
@@ -361,6 +362,7 @@ SQL
         $stmt->bind_param('ii', $issuingUserId, $assetId);
         $stmt->execute();
         $stmt->free_result();
+        $stmt->close();
 
         $stmt = $this->dbConnection->prepare(
             "UPDATE `ultra_assets` SET `num_assets` = `num_assets` + {$pendingNewQuantity}, `is_approved` = 1, `updated_at` = NOW() WHERE `id` = ?"
@@ -372,6 +374,7 @@ SQL
 
         $stmt->bind_param('i', $assetId);
         $stmt->execute();
+        $stmt->close();
 
         return $this->dbConnection->commit();
     }
@@ -414,21 +417,25 @@ SQL
         $stmt->bind_result($walletsInUse);
         $stmt->fetch();
         if (intval($walletsInUse) > 0) {
+            $stmt->close();
             throw new \RuntimeException('The asset cannot be deleted as it is already in use');
         }
         $stmt->free_result();
+        $stmt->close();
 
         $this->dbConnection->begin_transaction();
         $stmt = $this->dbConnection->prepare('DELETE FROM `ultra_asset_issuance_history` WHERE `asset_id` = ?');
         $stmt->bind_param('i', $assetId);
         $deleted = $stmt->execute();
         if (!$deleted) {
+            $stmt->close();
             throw new \RuntimeException('Error deleting the ultra launch history');
         }
 
         $stmt = $this->dbConnection->prepare('DELETE FROM `ultra_assets` WHERE `id` = ?');
         $stmt->bind_param('i', $assetId);
         $deleted = $stmt->execute();
+        $stmt->close();
         if (!$deleted) {
             $this->dbConnection->rollback();
             throw new \RuntimeException('Error deleting the ultra asset');

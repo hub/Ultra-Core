@@ -111,7 +111,7 @@ class OrderRepository
     /**
      * @return Orders
      */
-    public function getOrders()
+    public function getPendingOrders()
     {
         try {
             $resultSet = $this->database->query("SELECT * FROM `ultra_custom_buy_sell_orders` WHERE `status` = 'pending'");
@@ -161,32 +161,48 @@ class OrderRepository
      * Use this to update the status of any order which has been settled
      *
      * @param Orders $orders
-     *
-     * @throws DBALException
      */
     public function updateOrders(Orders $orders)
     {
-        foreach ($orders->getBuyOrders() as $buyOrder) {
-            $this->database->update(
-                'ultra_custom_buy_sell_orders',
-                [
-                    'status' => $buyOrder->getStatus(),
-                    'settled_amount_so_far' => $buyOrder->getSettledAmountSoFar(),
-                ],
-                ['id' => $buyOrder->getId()],
-                ['settled_amount_so_far' => PDO::PARAM_INT, 'status' => PDO::PARAM_STR]
-            );
+        try {
+            foreach ($orders->getBuyOrders() as $buyOrder) {
+                $this->database->update(
+                    'ultra_custom_buy_sell_orders',
+                    [
+                        'status' => $buyOrder->getStatus(),
+                        'settled_amount_so_far' => $buyOrder->getSettledAmountSoFar(),
+                    ],
+                    ['id' => $buyOrder->getId()],
+                    ['settled_amount_so_far' => PDO::PARAM_INT, 'status' => PDO::PARAM_STR]
+                );
+            }
+
+        } catch (DBALException $e) {
+            $this->logger->error(sprintf(
+                "Error occurred when updating the buy order [%s]. Error : %s",
+                (string)$buyOrder,
+                $e->getMessage()
+            ));
         }
-        foreach ($orders->getSellOrders() as $sellOrder) {
-            $this->database->update(
-                'ultra_custom_buy_sell_orders',
-                [
-                    'status' => $sellOrder->getStatus(),
-                    'settled_amount_so_far' => $sellOrder->getSettledAmountSoFar(),
-                ],
-                ['id' => $sellOrder->getId()],
-                ['settled_amount_so_far' => PDO::PARAM_INT, 'status' => PDO::PARAM_STR]
-            );
+
+        try {
+            foreach ($orders->getSellOrders() as $sellOrder) {
+                $this->database->update(
+                    'ultra_custom_buy_sell_orders',
+                    [
+                        'status' => $sellOrder->getStatus(),
+                        'settled_amount_so_far' => $sellOrder->getSettledAmountSoFar(),
+                    ],
+                    ['id' => $sellOrder->getId()],
+                    ['settled_amount_so_far' => PDO::PARAM_INT, 'status' => PDO::PARAM_STR]
+                );
+            }
+        } catch (DBALException $e) {
+            $this->logger->error(sprintf(
+                "Error occurred when updating the sell order [%s]. Error : %s",
+                (string)$sellOrder,
+                $e->getMessage()
+            ));
         }
     }
 
@@ -205,7 +221,8 @@ class OrderRepository
             $this->database->query("UPDATE `ultra_custom_buy_sell_orders` SET `num_match_attempts` = `num_match_attempts` + 1 WHERE `id` = {$orderId}");
         } catch (DBALException $e) {
             $this->logger->error(sprintf(
-                'Error occurred when increment the match attempt for order [%d]. Error : %s', $orderId,
+                'Error occurred when increment the match attempt for order [%d]. Error : %s',
+                $orderId,
                 $e->getMessage()
             ));
         }
@@ -235,7 +252,8 @@ class OrderRepository
             );
         } catch (DBALException $e) {
             $this->logger->error(sprintf(
-                'Error occurred when increment the match attempt for order [%d]. Error : %s', $orderId,
+                'Error occurred when increment the match attempt for order [%d]. Error : %s',
+                $orderId,
                 $e->getMessage()
             ));
         }
@@ -247,21 +265,29 @@ class OrderRepository
      * @param int   $mainOrderId    Main order id which we are settling
      * @param int   $matchedOrderId The matched order id
      * @param float $settleAmount   The amount being settled for the given main order id
-     *
-     * @throws DBALException
      */
     public function addSettlement($mainOrderId, $matchedOrderId, $settleAmount)
     {
-        $this->database->insert(
-            'ultra_custom_buy_sell_order_settlements',
-            [
-                'order_id' => $mainOrderId,
-                'matched_order_id' => $matchedOrderId,
-                'asset_amount' => $settleAmount,
-                'created_at' => date('Y-m-d H:i:s'),
-            ],
-            ['order_id' => PDO::PARAM_INT, 'matched_order_id' => PDO::PARAM_INT, 'asset_amount' => PDO::PARAM_INT]
-        );
+        try {
+            $this->database->insert(
+                'ultra_custom_buy_sell_order_settlements',
+                [
+                    'order_id' => $mainOrderId,
+                    'matched_order_id' => $matchedOrderId,
+                    'asset_amount' => $settleAmount,
+                    'created_at' => date('Y-m-d H:i:s'),
+                ],
+                ['order_id' => PDO::PARAM_INT, 'matched_order_id' => PDO::PARAM_INT, 'asset_amount' => PDO::PARAM_INT]
+            );
+        } catch (DBALException $e) {
+            $this->logger->error(sprintf(
+                'Error occurred when adding a new settlement. MainOrderId[%s], MatchedOrderId[%s], SettleAmount[%s]. Error : %s',
+                $mainOrderId,
+                $matchedOrderId,
+                $settleAmount,
+                $e->getMessage()
+            ));
+        }
     }
 
     /**

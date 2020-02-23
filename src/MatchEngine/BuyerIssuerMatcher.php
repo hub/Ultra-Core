@@ -71,6 +71,11 @@ class BuyerIssuerMatcher
     private $logger;
 
     /**
+     * @var int
+     */
+    private $buyOrderMatchThreshold;
+
+    /**
      * BuyerIssuerMatcher constructor.
      *
      * @param Exchange                $exchange
@@ -80,6 +85,7 @@ class BuyerIssuerMatcher
      * @param UltraAssetsRepository   $ultraAssetsRepository
      * @param WalletRepository        $walletRepository
      * @param LoggerInterface         $logger
+     * @param int                     $buyOrderMatchThreshold
      */
     public function __construct(
         Exchange $exchange,
@@ -88,7 +94,8 @@ class BuyerIssuerMatcher
         UltraVenRepository $venRepository,
         UltraAssetsRepository $ultraAssetsRepository,
         WalletRepository $walletRepository,
-        LoggerInterface $logger
+        LoggerInterface $logger,
+        $buyOrderMatchThreshold = Orders::MAX_MATCH_ATTEMPTS_PER_BUY_ORDER
     ) {
         $this->exchange = $exchange;
         $this->orderRepository = $orderRepository;
@@ -97,6 +104,7 @@ class BuyerIssuerMatcher
         $this->ultraAssetsRepository = $ultraAssetsRepository;
         $this->walletRepository = $walletRepository;
         $this->logger = $logger;
+        $this->buyOrderMatchThreshold = $buyOrderMatchThreshold;
     }
 
     /**
@@ -111,13 +119,14 @@ class BuyerIssuerMatcher
      */
     public function execute()
     {
-        $buyOrders = $this->orderRepository->getOrders()->getBuyOrders();
-        foreach ($buyOrders as $buyOrder) {
+        $orders = $this->orderRepository->getPendingOrders();
+        $buyOrders = $orders->getBuyOrders();
+        foreach ($buyOrders as &$buyOrder) {
             $this->logger->info(sprintf('Processing buy order %s', (string)$buyOrder));
 
             // do not buy off of issuers directly if enough match attempts made
-            if ($buyOrder->getNumMatchAttempts() < Orders::MAX_MATCH_ATTEMPTS_PER_BUY_ORDER) {
-                $this->logger->debug("Buy order [{$buyOrder->getId()}] has not reached the threshold to be settled via an issuer");
+            if ($buyOrder->getNumMatchAttempts() < $this->buyOrderMatchThreshold) {
+                $this->logger->debug("Buy order [{$buyOrder->getId()}] has not reached the threshold [{$this->buyOrderMatchThreshold}] to be settled via an issuer");
                 continue;
             }
 
@@ -127,7 +136,7 @@ class BuyerIssuerMatcher
                 continue;
             }
 
-            $venWallet = $this->venRepository->getVenWalletOfUser($buyOrder->getId());
+            $venWallet = $this->venRepository->getVenWalletOfUser($buyOrder->getUserId());
             if (is_null($venWallet)) {
                 $this->orderRepository->rejectOrder($buyOrder->getId(), 'Cannot find the Ven wallet');
                 $this->logger->debug('Cannot find the Ven wallet of the buyer');
@@ -179,13 +188,12 @@ class BuyerIssuerMatcher
                 $weightingConfig[] = $weighting->toArray();
             });
             $metaData = [];
-            $metaData['asset_amount_in_ven'] = $totalVenAmountForAssets;
+            $metaData[MatchedOrderMetaData::ASSET_AMOUNT_IN_VEN] = $totalVenAmountForAssets;
             $metaData['asset_amount_for_one_ven'] = $this->exchange
                 ->convertFromVenToOther(new Money(1, Currency::VEN()), $asset->getCurrency())
                 ->getAmountAsString();
-            $metaData['ven_amount_for_one_asset'] = $venAmountForOneAsset;
+            $metaData[MatchedOrderMetaData::VEN_AMOUNT_FOR_ONE_ASSET] = $venAmountForOneAsset;
             $metaData['weightingConfig'] = $weightingConfig;
-            $metaData['commit'] = true;
 
             $buyerWallet = $this->walletRepository->getUserWallet($buyOrder->getUserId(), $asset->id());
             $this->walletRepository->credit($buyerWallet, $buyOrder->getAmount(), $metaData);
@@ -210,8 +218,11 @@ class BuyerIssuerMatcher
                 );
             }
 
+            $buyOrder->setStatus(Orders::STATUS_PROCESSED);
             $this->logger->info(sprintf("Done processing this buy order [%d]", $buyOrder->getId()));
         }
+
+        $this->orderRepository->updateOrders(new Orders($buyOrders, $orders->getSellOrders()));
     }
 
     /**

@@ -7,6 +7,7 @@
 namespace Hub\UltraCore;
 
 use Hub\UltraCore\Exception\WalletException;
+use Hub\UltraCore\MatchEngine\MatchedOrderMetaData;
 use Hub\UltraCore\MatchEngine\MatchEngine;
 use Hub\UltraCore\MatchEngine\Order\BuyOrder;
 use Hub\UltraCore\MatchEngine\Order\OrderRepository;
@@ -78,7 +79,7 @@ class DefaultWalletHandler implements WalletHandler
      * @param int        $userId                     Hub Culture identifier of the purchasing user.
      * @param UltraAsset $asset
      * @param float      $purchaseAssetAmount
-     * @param float|null $customVenAmountForOneAsset A user can propose a different rate instead using the market rate
+     * @param float      $customVenAmountForOneAsset A user can propose a different rate instead using the market rate
      *                                               when buying an asset. The buyer is willing to pay this much in Ven
      *                                               for one ULTRA asset.
      *
@@ -86,7 +87,7 @@ class DefaultWalletHandler implements WalletHandler
      * @throws InsufficientAssetAvailabilityException
      * @throws WalletException
      */
-    public function purchase($userId, UltraAsset $asset, $purchaseAssetAmount, $customVenAmountForOneAsset = null)
+    public function purchase($userId, UltraAsset $asset, $purchaseAssetAmount, $customVenAmountForOneAsset = 0.0)
     {
         if (floatval($purchaseAssetAmount) <= 0.0) {
             throw new WalletException("Purchase amount must be greater than zero(0)");
@@ -125,7 +126,7 @@ class DefaultWalletHandler implements WalletHandler
                 0,
                 $userId,
                 $asset->id(),
-                !is_null($customVenAmountForOneAsset) ? $customVenAmountForOneAsset : $venAmountForOneAsset,
+                $customVenAmountForOneAsset > 0.0 ? $customVenAmountForOneAsset : $venAmountForOneAsset,
                 $purchaseAssetAmount,
                 0,
                 Orders::STATUS_PENDING
@@ -140,13 +141,13 @@ class DefaultWalletHandler implements WalletHandler
      * @param int        $userId                     Hub Culture identifier of the selling user.
      * @param UltraAsset $asset                      Ultra asset created by a user.
      * @param float      $sellAssetAmount            Amount of assets that the user is about to sell.
-     * @param float|null $customVenAmountForOneAsset A user can propose a different rate instead using the market rate
+     * @param float      $customVenAmountForOneAsset A user can propose a different rate instead using the market rate
      *                                               when selling an asset.
      *
      * @throws InsufficientUltraAssetBalanceException
      * @throws WalletException
      */
-    public function sell($userId, UltraAsset $asset, $sellAssetAmount, $customVenAmountForOneAsset = null)
+    public function sell($userId, UltraAsset $asset, $sellAssetAmount, $customVenAmountForOneAsset = 0.0)
     {
         // let's calculate the asset amount that the seller needs to pay to cover our commission in ven
         $withdrawalFee = UltraAssetsRepository::WITHDRAWAL_VEN_FEE;
@@ -181,17 +182,16 @@ class DefaultWalletHandler implements WalletHandler
 
         $metaData = [];
         $venAmountForOneAsset = $this->getVenAmountForOneAsset($asset);
-        $metaData['asset_amount_in_ven'] = ($venAmountForOneAsset * $sellAssetAmount);
+        $metaData[MatchedOrderMetaData::ASSET_AMOUNT_IN_VEN] = ($venAmountForOneAsset * $sellAssetAmount);
         $metaData['asset_amount_for_withdrawal_fee'] = $assetAmountForWithdrawalFee;
         $metaData['asset_amount_for_exchange_fee'] = $assetAmountForExchangeCommission;
         $metaData['asset_amount_for_one_ven'] = $this->exchange
             ->convertFromVenToOther(new Money(1, Currency::VEN()), $asset->getCurrency())
             ->getAmountAsString();
-        $metaData['ven_amount_for_one_asset'] = $venAmountForOneAsset;
+        $metaData[MatchedOrderMetaData::VEN_AMOUNT_FOR_ONE_ASSET] = $venAmountForOneAsset;
         $metaData['weightingConfig'] = $weightingConfig;
         $metaData['hc_withdrawal_fee'] = UltraAssetsRepository::WITHDRAWAL_VEN_FEE;
         $metaData['hc_exchange_fee'] = UltraAssetsRepository::EXCHANGE_PERCENT_FEE;
-        $metaData['commit'] = true; // we can commit this as this is our fee
 
         // let's charge the fee first by deducting the asset amount from the seller and transferring to us
         $sellingFeesInAssetAmount = $assetAmountForWithdrawalFee + $assetAmountForExchangeCommission;
@@ -212,7 +212,7 @@ class DefaultWalletHandler implements WalletHandler
                 0,
                 $userId,
                 $asset->id(),
-                !is_null($customVenAmountForOneAsset) ? $customVenAmountForOneAsset : $venAmountForOneAsset,
+                $customVenAmountForOneAsset > 0.0 ? $customVenAmountForOneAsset : $venAmountForOneAsset,
                 // the actual selling amount is after deducting our fees
                 $sellAssetAmount - $sellingFeesInAssetAmount,
                 0,
@@ -252,11 +252,11 @@ class DefaultWalletHandler implements WalletHandler
         });
 
         $venAmountForOneAsset = $this->getVenAmountForOneAsset($asset);
-        $metaData['asset_amount_in_ven'] = ($venAmountForOneAsset * $purchaseAssetAmount);
+        $metaData[MatchedOrderMetaData::ASSET_AMOUNT_IN_VEN] = ($venAmountForOneAsset * $purchaseAssetAmount);
         $metaData['asset_amount_for_one_ven'] = $this->exchange
             ->convertFromVenToOther(new Money(1, Currency::VEN()), $asset->getCurrency())
             ->getAmountAsString();
-        $metaData['ven_amount_for_one_asset'] = $venAmountForOneAsset;
+        $metaData[MatchedOrderMetaData::VEN_AMOUNT_FOR_ONE_ASSET] = $venAmountForOneAsset;
         $metaData['weightingConfig'] = $weightingConfig;
         $metaData['is_transfer'] = 1; // this is to mark this as a fund transfer
         $metaData['transfer_message'] = $message;

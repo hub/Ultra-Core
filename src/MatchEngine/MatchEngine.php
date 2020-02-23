@@ -110,11 +110,7 @@ class MatchEngine
             );
 
             // let's settle the order in terms of assets. (debit and credit the two user accounts respectively)
-            $metaData = [
-                'ven_amount_for_one_asset' => $buyOrder->getOfferingRate(),
-                'asset_amount_in_ven' => $buyOrder->getOfferingRate() * $orderPair->getSettledAmount(),
-                'commit_outcome' => 'processed',
-            ];
+            $metaData = MatchedOrderMetaData::from($orderPair);
             $this->walletRepository->credit($buyerAssetWallet, $orderPair->getSettledAmount(), $metaData);
             $this->walletRepository->debit($sellerAssetWallet, $orderPair->getSettledAmount(), $metaData);
 
@@ -134,7 +130,7 @@ class MatchEngine
                 $buyOrder->getUserId(),
                 $sellOrder->getUserId(),
                 $sellerTotalGainInVen,
-                'An order placed on the ULTRA exchange'
+                'An order placed on the ULTRA Exchange'
             );
 
             /**

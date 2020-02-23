@@ -25,7 +25,7 @@ abstract class AbstractOrder
     private $assetId;
 
     /**
-     * @var float This is the Ven rate which this buyer is willing to use to buy 1 Asset
+     * @var float This is the Ven rate which a buyer or a seller in offering
      */
     private $offeringRate;
 
