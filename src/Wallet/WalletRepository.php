@@ -119,7 +119,7 @@ SQL
 
         $wallets = array();
         $stmt->bind_result($id, $userId, $assetId, $balance, $availableBalance, $publicKey);
-        if ($stmt->fetch()) {
+        while ($stmt->fetch()) {
             $wallets[] = new Wallet($id, $userId, $assetId, $balance, $availableBalance, $publicKey);
         }
         $stmt->close();
@@ -187,6 +187,7 @@ SQL
             INNER JOIN `ultra_assets` a ON (a.id = w.asset_id)
             WHERE
                 t.`user_id` = {$userId}
+            ORDER BY t.`created_at` DESC
             LIMIT {$offset}, {$limit}
 SQL
         );
@@ -240,6 +241,7 @@ SQL
             WHERE
                 t.`user_id` = {$userId}
                 AND t.`wallet_id` = {$walletId}
+            ORDER BY t.`created_at` DESC
             LIMIT {$offset}, {$limit}
 SQL
         );
