@@ -120,16 +120,17 @@ class DefaultWalletHandler implements WalletHandler
             ));
         }
 
+        if (floatval($customVenAmountForOneAsset) <= 0.0) {
+            $customVenAmountForOneAsset = $venAmountForOneAsset;
+        }
+
         // and then we can add this sell order to be processed asynchronously later when matched with a buy order
         $this->orderRepository->addBuyOrder(
-            new BuyOrder(
-                0,
+            BuyOrder::newPendingOrder(
                 $userId,
                 $asset->id(),
-                $customVenAmountForOneAsset > 0.0 ? $customVenAmountForOneAsset : $venAmountForOneAsset,
-                $purchaseAssetAmount,
-                0,
-                Orders::STATUS_PENDING
+                $customVenAmountForOneAsset,
+                $purchaseAssetAmount
             ),
             $venAmountForOneAsset
         );
@@ -149,74 +150,36 @@ class DefaultWalletHandler implements WalletHandler
      */
     public function sell($userId, UltraAsset $asset, $sellAssetAmount, $customVenAmountForOneAsset = 0.0)
     {
-        // let's calculate the asset amount that the seller needs to pay to cover our commission in ven
-        $withdrawalFee = UltraAssetsRepository::WITHDRAWAL_VEN_FEE;
-        $assetAmountForWithdrawalFee = $this->exchange
-            ->convertFromVenToOther(new Money($withdrawalFee, Currency::VEN()), $asset->getCurrency())
-            ->getAmount();
-
-        $assetAmountForExchangeCommission = $sellAssetAmount * (UltraAssetsRepository::EXCHANGE_PERCENT_FEE / 100);
-        $sellAssetAmount += $assetAmountForWithdrawalFee + $assetAmountForExchangeCommission;
+        if (floatval($sellAssetAmount) <= 0.0) {
+            throw new WalletException("Purchase amount must be greater than zero(0)");
+        }
 
         $wallet = $this->walletRepository->getUserWallet($userId, $asset->id());
 
         // ven balance validation : do not let them pay ven they don't have in their balance
         if ($sellAssetAmount > $wallet->getAvailableBalance()) {
             throw new InsufficientUltraAssetBalanceException(sprintf(
-                "You do not have enough %s balance to sell an amount of %s assets. Our withdrawal commission is %s %s (%s Ven). You currently have %s in your %s wallet.",
+                "You do not have enough %s balance to sell an amount of %s assets. You currently have %s in your %s wallet.",
                 $asset->tickerSymbol(),
                 $sellAssetAmount,
-                $assetAmountForWithdrawalFee + $assetAmountForExchangeCommission,
-                $asset->tickerSymbol(),
-                $withdrawalFee,
                 $wallet->getAvailableBalance(),
                 $asset->tickerSymbol()
             ));
         }
 
-        $weightingConfig = [];
-        $weightings = $asset->weightings();
-        array_walk($weightings, function (UltraAssetWeighting $weighting) use (&$weightingConfig) {
-            $weightingConfig[] = $weighting->toArray();
-        });
-
-        $metaData = [];
         $venAmountForOneAsset = $this->getVenAmountForOneAsset($asset);
-        $metaData[MatchedOrderMetaData::ASSET_AMOUNT_IN_VEN] = ($venAmountForOneAsset * $sellAssetAmount);
-        $metaData['asset_amount_for_withdrawal_fee'] = $assetAmountForWithdrawalFee;
-        $metaData['asset_amount_for_exchange_fee'] = $assetAmountForExchangeCommission;
-        $metaData['asset_amount_for_one_ven'] = $this->exchange
-            ->convertFromVenToOther(new Money(1, Currency::VEN()), $asset->getCurrency())
-            ->getAmountAsString();
-        $metaData[MatchedOrderMetaData::VEN_AMOUNT_FOR_ONE_ASSET] = $venAmountForOneAsset;
-        $metaData['weightingConfig'] = $weightingConfig;
-        $metaData['hc_withdrawal_fee'] = UltraAssetsRepository::WITHDRAWAL_VEN_FEE;
-        $metaData['hc_exchange_fee'] = UltraAssetsRepository::EXCHANGE_PERCENT_FEE;
-
-        // let's charge the fee first by deducting the asset amount from the seller and transferring to us
-        $sellingFeesInAssetAmount = $assetAmountForWithdrawalFee + $assetAmountForExchangeCommission;
-        $this->walletRepository->debit(
-            $wallet,
-            $sellingFeesInAssetAmount,
-            $metaData
-        );
-        $this->walletRepository->credit(
-            $this->walletRepository->getUserWallet(MatchEngine::SYSTEM_USER_ID, $asset->id()),
-            $sellingFeesInAssetAmount,
-            $metaData
-        );
+        if (floatval($customVenAmountForOneAsset) <= 0.0) {
+            $customVenAmountForOneAsset = $venAmountForOneAsset;
+        }
 
         // and then we can add this sell order to be processed asynchronously later when matched with a buy order
         $this->orderRepository->addSellOrder(
-            new SellOrder(
-                0,
+            SellOrder::newPendingOrder(
                 $userId,
                 $asset->id(),
-                $customVenAmountForOneAsset > 0.0 ? $customVenAmountForOneAsset : $venAmountForOneAsset,
+                $customVenAmountForOneAsset,
                 // the actual selling amount is after deducting our fees
-                $sellAssetAmount - $sellingFeesInAssetAmount,
-                0,
-                Orders::STATUS_PENDING
+                $sellAssetAmount
             ),
             $venAmountForOneAsset
         );

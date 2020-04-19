@@ -107,9 +107,9 @@ class BuyerIssuerMatcher
         $orders = $this->orderRepository->getPendingOrders();
         $buyOrders = $orders->getBuyOrders();
         foreach ($buyOrders as &$buyOrder) {
-            $this->logger->info(sprintf('Processing buy order %s', (string)$buyOrder));
+            $this->logger->info(sprintf('Processing buy order %s', (string)$buyOrder), [__CLASS__]);
 
-            // do not buy off of issuers directly if enough match attempts made
+            // do not buy off of issuers directly if enough match attempts has NOT made
             if ($buyOrder->getNumMatchAttempts() < $this->buyOrderMatchThreshold) {
                 $this->logger->debug("Buy order [{$buyOrder->getId()}] has not reached the threshold [{$this->buyOrderMatchThreshold}] to be settled via an issuer");
                 continue;
@@ -117,14 +117,14 @@ class BuyerIssuerMatcher
 
             $asset = $this->ultraAssetsRepository->getAssetById($buyOrder->getAssetId());
             if (is_null($asset)) {
-                $this->logger->warning("A valid ULTRA asset cannot be found for the asset id {$buyOrder->getAssetId()}");
+                $this->logger->warning("A valid ULTRA asset cannot be found for the asset id {$buyOrder->getAssetId()}", [__CLASS__]);
                 continue;
             }
 
             $venWallet = $this->venRepository->getVenWalletOfUser($buyOrder->getUserId());
             if (is_null($venWallet)) {
                 $this->orderRepository->rejectOrder($buyOrder->getId(), 'Cannot find the Ven wallet');
-                $this->logger->debug('Cannot find the Ven wallet of the buyer');
+                $this->logger->debug('Cannot find the Ven wallet of the buyer', [__CLASS__]);
                 continue;
             }
 
@@ -139,7 +139,7 @@ class BuyerIssuerMatcher
                     $venWallet->getBalance(),
                     $totalVenAmountForAssets
                 );
-                $this->logger->debug($rejectionReason);
+                $this->logger->debug($rejectionReason, [__CLASS__]);
                 $this->orderRepository->rejectOrder($buyOrder->getId(), $rejectionReason);
                 continue;
             }
@@ -152,7 +152,7 @@ class BuyerIssuerMatcher
                     $purchaseAssetAmount,
                     $asset->numAssets()
                 );
-                $this->logger->debug($rejectionReason);
+                $this->logger->debug($rejectionReason, [__CLASS__]);
                 $this->orderRepository->rejectOrder($buyOrder->getId(), $rejectionReason);
                 continue;
             }
@@ -160,10 +160,11 @@ class BuyerIssuerMatcher
             // now that we are done with validations for funds and wallet integrity. let's try to find a issuer authority
             $issuers = $this->assetSelectionStrategy->select($asset->id(), $buyOrder->getAmount());
             $this->logger->debug(
-                sprintf("Found [%d] issuers for the buy order [%d]", count($issuers), $buyOrder->getId())
+                sprintf("Found [%d] issuers for the buy order [%d]", count($issuers), $buyOrder->getId()),
+                [__CLASS__]
             );
             if (empty($issuers)) {
-                $this->logger->warning("No authority issuers found. skipping this order");
+                $this->logger->warning("No authority issuers found. skipping this order", [__CLASS__]);
                 continue;
             }
 
@@ -204,10 +205,79 @@ class BuyerIssuerMatcher
             }
 
             $buyOrder->setStatus(Orders::STATUS_PROCESSED);
-            $this->logger->info(sprintf("Done processing this buy order [%d]", $buyOrder->getId()));
+            $this->logger->info(sprintf("Done processing this buy order [%d]", $buyOrder->getId()), [__CLASS__]);
         }
 
-        $this->orderRepository->updateOrders(new Orders($buyOrders, $orders->getSellOrders()));
+        $sellOrders = $orders->getSellOrders();
+        foreach ($sellOrders as &$sellOrder) {
+            $this->logger->info(sprintf('Processing sell order %s', (string)$sellOrder), [__CLASS__]);
+
+            // do not sell to the system user if enough match attempts has NOT made
+            if ($sellOrder->getNumMatchAttempts() < $this->buyOrderMatchThreshold) {
+                $this->logger->debug("Sell order [{$sellOrder->getId()}] has not reached the threshold [{$this->buyOrderMatchThreshold}] to be settled via an issuer");
+                continue;
+            }
+
+            $asset = $this->ultraAssetsRepository->getAssetById($sellOrder->getAssetId());
+            if (is_null($asset)) {
+                $this->logger->warning("A valid ULTRA asset cannot be found for the asset id {$sellOrder->getAssetId()}", [__CLASS__]);
+                continue;
+            }
+
+            $sellAssetAmount = $sellOrder->getAmount();
+
+            // asset balance validation : do not let anyone sell more than the available number of assets in their wallet
+            $newAssetBalance = $asset->numAssets() - $sellAssetAmount;
+            if ($newAssetBalance < 0) {
+                $rejectionReason = sprintf(
+                    'There is no enough balance in the seller\'s wallet to sell %s. Only %s available now.',
+                    $sellAssetAmount,
+                    $asset->numAssets()
+                );
+                $this->logger->debug($rejectionReason, [__CLASS__]);
+                $this->orderRepository->rejectOrder($sellOrder->getId(), $rejectionReason);
+                continue;
+            }
+
+            $venAmountForOneAsset = $this->getVenAmountForOneAsset($asset);
+            $totalVenAmountForAssets = ($venAmountForOneAsset * $sellAssetAmount);
+
+            $weightingConfig = [];
+            $weightings = $asset->weightings();
+            array_walk($weightings, function (UltraAssetWeighting $weighting) use (&$weightingConfig) {
+                $weightingConfig[] = $weighting->toArray();
+            });
+            $metaData = [];
+            $metaData[MatchedOrderMetaData::ASSET_AMOUNT_IN_VEN] = $totalVenAmountForAssets;
+            $metaData['asset_amount_for_one_ven'] = $this->exchange
+                ->convertFromVenToOther(new Money(1, Currency::VEN()), $asset->getCurrency())
+                ->getAmountAsString();
+            $metaData[MatchedOrderMetaData::VEN_AMOUNT_FOR_ONE_ASSET] = $venAmountForOneAsset;
+            $metaData['weightingConfig'] = $weightingConfig;
+
+            $sellerWallet = $this->walletRepository->getUserWallet($sellOrder->getUserId(), $asset->id());
+            $this->walletRepository->debit($sellerWallet, $sellAssetAmount, $metaData);
+
+            // let's send this amount to the system user as we couln't
+            $this->walletRepository->credit(
+                $this->walletRepository->getUserWallet(MatchEngine::SYSTEM_USER_ID, $asset->id()),
+                $sellAssetAmount,
+                $metaData
+            );
+
+            // reduce the amount paid in VEN from the user's VEN account and credit it to the each asset issuer account.
+            $venMessage = "Sold an amount of {$sellAssetAmount} {$asset->title()} assets @{$venAmountForOneAsset} VEN per 1 {$asset->title()}. Click <a href='/markets/my-wallets/transactions?id={$sellerWallet->getId()}'>here</a> for more info.";
+            $this->venRepository->sendVen(
+                MatchEngine::SYSTEM_USER_ID,
+                $sellOrder->getUserId(),
+                $totalVenAmountForAssets,
+                $venMessage
+            );
+
+            $this->logger->info(sprintf("Done processing this sell order [%d]", $sellOrder->getId()), [__CLASS__]);
+        }
+
+        $this->orderRepository->updateOrders(new Orders($buyOrders, $sellOrders));
     }
 
     /**

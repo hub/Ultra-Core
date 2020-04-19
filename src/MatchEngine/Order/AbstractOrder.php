@@ -234,4 +234,18 @@ abstract class AbstractOrder
      * @return self
      */
     public abstract function match(AbstractOrder $order);
+
+    /**
+     * Use this to get a pending order of any kind.
+     *
+     * @param int   $userId              Unique Hub Culture user identifier related to this buy/sell order.
+     * @param int   $assetId             A valid asset identifier
+     * @param float $offeringRate        The rate at which the buyer is willing to buy the given asset from a seller.
+     *                                   Or the rate at which the seller is offering this asset to be sold to a buyer
+     * @param float $amount              Amount of assets being bought originally. Aka number of units
+     *                                   Or the amount of assets being sold originally.
+     *
+     * @return self
+     */
+    public abstract static function newPendingOrder($userId, $assetId, $offeringRate, $amount);
 }
