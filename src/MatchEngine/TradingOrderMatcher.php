@@ -54,6 +54,7 @@ class TradingOrderMatcher
             if (!is_null($matchedOrder)) {
                 if ($matchedOrder->getAmount() === $matchedOrder->getSettledAmountSoFar()) {
                     $matchedOrder->setStatus(Orders::STATUS_PROCESSED);
+                    $this->orderRepository->processOrder($matchedOrder->getId());
                 }
 
                 $this->orderRepository->addSettlement(
@@ -65,6 +66,7 @@ class TradingOrderMatcher
             // let's update the status to processed, if we have settled the full amount
             if ($sellOrder->getAmount() === $sellOrder->getSettledAmountSoFar()) {
                 $sellOrder->setStatus(Orders::STATUS_PROCESSED);
+                $this->orderRepository->processOrder($sellOrder->getId());
             }
         }
 
@@ -76,6 +78,7 @@ class TradingOrderMatcher
             if (!is_null($matchedOrder)) {
                 if ($matchedOrder->getAmount() === $matchedOrder->getSettledAmountSoFar()) {
                     $matchedOrder->setStatus(Orders::STATUS_PROCESSED);
+                    $this->orderRepository->processOrder($matchedOrder->getId());
                 }
 
                 $this->orderRepository->addSettlement(
@@ -87,13 +90,11 @@ class TradingOrderMatcher
             // let's update the status to processed, if we have settled the full amount
             if ($buyOrder->getAmount() === $buyOrder->getSettledAmountSoFar()) {
                 $buyOrder->setStatus(Orders::STATUS_PROCESSED);
+                $this->orderRepository->processOrder($buyOrder->getId());
             }
         }
 
-        $matchedOrders = new Orders($buyOrders, $sellOrders);
-        $this->orderRepository->updateOrders($matchedOrders);
-
-        return $matchedOrders;
+        return new Orders($buyOrders, $sellOrders);
     }
 
     /**

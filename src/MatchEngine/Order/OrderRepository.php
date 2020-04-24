@@ -250,9 +250,43 @@ class OrderRepository
                 ['id' => $orderId],
                 ['status' => PDO::PARAM_STR, 'notes' => PDO::PARAM_STR]
             );
+            $this->logger->info(sprintf("Marked the order [%d] as 'rejected'", $orderId), [__CLASS__]);
         } catch (DBALException $e) {
             $this->logger->error(sprintf(
-                'Error occurred when increment the match attempt for order [%d]. Error : %s',
+                'Error occurred when rejecting the order [%d]. Error : %s',
+                $orderId,
+                $e->getMessage()
+            ));
+        }
+    }
+
+    /**
+     * Use this to process an order. This mark an order placed by a user as processed. Only ever call this once you are
+     * done settling money from/to wallets.
+     *
+     * @param int    $orderId Order ID that you need to mark as processed
+     * @param string $notes   [optional] notes.
+     */
+    public function processOrder($orderId, $notes = '')
+    {
+        if (intval($orderId) === 0) {
+            return;
+        }
+
+        try {
+            $this->database->update(
+                'ultra_custom_buy_sell_orders',
+                [
+                    'status' => Orders::STATUS_PROCESSED,
+                    'notes' => $notes,
+                ],
+                ['id' => $orderId],
+                ['status' => PDO::PARAM_STR, 'notes' => PDO::PARAM_STR]
+            );
+            $this->logger->info(sprintf("Marked the order [%d] as 'processed'", $orderId), [__CLASS__]);
+        } catch (DBALException $e) {
+            $this->logger->error(sprintf(
+                'Error occurred when processing the order [%d]. Error : %s',
                 $orderId,
                 $e->getMessage()
             ));

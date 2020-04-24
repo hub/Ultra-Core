@@ -106,7 +106,7 @@ class BuyerIssuerMatcher
     {
         $orders = $this->orderRepository->getPendingOrders();
         $buyOrders = $orders->getBuyOrders();
-        foreach ($buyOrders as &$buyOrder) {
+        foreach ($buyOrders as $buyOrder) {
             $this->logger->info(sprintf('Processing buy order %s', (string)$buyOrder), [__CLASS__]);
 
             // do not buy off of issuers directly if enough match attempts has NOT made
@@ -204,12 +204,12 @@ class BuyerIssuerMatcher
                 );
             }
 
-            $buyOrder->setStatus(Orders::STATUS_PROCESSED);
+            $this->orderRepository->processOrder($buyOrder->getId());
             $this->logger->info(sprintf("Done processing this buy order [%d]", $buyOrder->getId()), [__CLASS__]);
         }
 
         $sellOrders = $orders->getSellOrders();
-        foreach ($sellOrders as &$sellOrder) {
+        foreach ($sellOrders as $sellOrder) {
             $this->logger->info(sprintf('Processing sell order %s', (string)$sellOrder), [__CLASS__]);
 
             // do not sell to the system user if enough match attempts has NOT made
@@ -274,11 +274,9 @@ class BuyerIssuerMatcher
                 $venMessage
             );
 
-            $sellOrder->setStatus(Orders::STATUS_PROCESSED);
+            $this->orderRepository->processOrder($sellOrder->getId());
             $this->logger->info(sprintf("Done processing this sell order [%d]", $sellOrder->getId()), [__CLASS__]);
         }
-
-        $this->orderRepository->updateOrders(new Orders($buyOrders, $sellOrders));
     }
 
     /**
