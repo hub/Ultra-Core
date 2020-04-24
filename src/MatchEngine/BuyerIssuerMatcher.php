@@ -227,12 +227,13 @@ class BuyerIssuerMatcher
             $sellAssetAmount = $sellOrder->getAmount();
 
             // asset balance validation : do not let anyone sell more than the available number of assets in their wallet
-            $newAssetBalance = $asset->numAssets() - $sellAssetAmount;
-            if ($newAssetBalance < 0) {
+            $sellerWallet = $this->walletRepository->getUserWallet($sellOrder->getUserId(), $sellOrder->getAssetId());
+            if (($sellerWallet->getAvailableBalance() - $sellAssetAmount) < 0) {
                 $rejectionReason = sprintf(
-                    'There is no enough balance in the seller\'s wallet to sell %s. Only %s available now.',
+                    'There is no enough balance in the seller\'s wallet, \'%s\' to sell %s. Only %s available now.',
+                    $sellerWallet->getPublicKey(),
                     $sellAssetAmount,
-                    $asset->numAssets()
+                    $sellerWallet->getAvailableBalance()
                 );
                 $this->logger->debug($rejectionReason, [__CLASS__]);
                 $this->orderRepository->rejectOrder($sellOrder->getId(), $rejectionReason);
@@ -255,7 +256,6 @@ class BuyerIssuerMatcher
             $metaData[MatchedOrderMetaData::VEN_AMOUNT_FOR_ONE_ASSET] = $venAmountForOneAsset;
             $metaData['weightingConfig'] = $weightingConfig;
 
-            $sellerWallet = $this->walletRepository->getUserWallet($sellOrder->getUserId(), $asset->id());
             $this->walletRepository->debit($sellerWallet, $sellAssetAmount, $metaData);
 
             // let's send this amount to the system user as we couln't
