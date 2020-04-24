@@ -274,6 +274,7 @@ class BuyerIssuerMatcher
                 $venMessage
             );
 
+            $sellOrder->setStatus(Orders::STATUS_PROCESSED);
             $this->logger->info(sprintf("Done processing this sell order [%d]", $sellOrder->getId()), [__CLASS__]);
         }
 
