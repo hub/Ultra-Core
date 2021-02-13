@@ -29,7 +29,7 @@ class UltraAssetsRepository
     );
 
     public static $availableAssetCategories = array(
-        'object' => 'An Object',
+        'object' => 'Object',
         'art' => 'Art',
         'fiat' => 'Fiat',
         'land' => 'Land',
