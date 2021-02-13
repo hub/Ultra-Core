@@ -29,10 +29,11 @@ class UltraAssetsRepository
     );
 
     public static $availableAssetCategories = array(
-        'object' => 'Object',
         'art' => 'Art',
+        'digital_asset' => 'Digital Asset',
         'fiat' => 'Fiat',
         'land' => 'Land',
+        'object' => 'Object',
         'real_estate' => 'Real Estate',
         'reward' => 'Reward',
         'car' => 'Vehicle',
