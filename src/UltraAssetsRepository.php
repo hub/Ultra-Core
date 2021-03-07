@@ -64,10 +64,10 @@ class UltraAssetsRepository
     /**
      * @return UltraAsset[]
      */
-    public function getAllActiveAssets()
+    public function getAllActiveAssets($filters = array())
     {
         /** @var \mysqli_result $stmt */
-        $stmt = $this->dbConnection->query($this->getUltraAssetRetrievalQuery());
+        $stmt = $this->dbConnection->query($this->getUltraAssetRetrievalQuery($filters));
         if ($stmt->num_rows === 0) {
             return array();
         }
