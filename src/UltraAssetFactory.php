@@ -24,6 +24,7 @@ class UltraAssetFactory
             $asset['id'],
             $asset['hash'],
             $asset['title'],
+            $asset['description'],
             $asset['category'],
             $asset['ticker_symbol'],
             $asset['num_assets'],

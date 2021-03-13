@@ -20,6 +20,9 @@ class UltraAsset
     private $title;
 
     /** @var string */
+    private $description;
+
+    /** @var string */
     private $tickerSymbol;
 
     /** @var float */
@@ -55,6 +58,7 @@ class UltraAsset
      * @param int                   $id
      * @param string                $weightingHash
      * @param string                $title
+     * @param string                $description
      * @param string                $category
      * @param string                $tickerSymbol
      * @param float                 $numAssets
@@ -71,6 +75,7 @@ class UltraAsset
         $id,
         $weightingHash,
         $title,
+        $description,
         $category,
         $tickerSymbol,
         $numAssets,
@@ -86,6 +91,7 @@ class UltraAsset
         $this->id = $id;
         $this->weightingHash = $weightingHash;
         $this->setTitle($title);
+        $this->setDescription($description);
         $this->category = $category;
         $this->setTickerSymbol($tickerSymbol);
         $this->incrementAssetsQuantity(floatval($numAssets));
@@ -137,6 +143,22 @@ class UltraAsset
     public function setTitle($title)
     {
         $this->title = $title;
+    }
+
+    /**
+     * @return string
+     */
+    public function description()
+    {
+        return $this->description;
+    }
+
+    /**
+     * @param string $description
+     */
+    public function setDescription($description)
+    {
+        $this->description = $description;
     }
 
     /**

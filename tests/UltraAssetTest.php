@@ -20,6 +20,7 @@ class UltraAssetTest extends TestCase
             'id' => 1,
             'weightingHash' => 'weightingHash',
             'title' => 'title1',
+            'description' => 'description1',
             'category' => 'category1',
             'tickerSymbol' => 'tickerSymbol1',
             'numAssets' => 234.67,
@@ -36,6 +37,7 @@ class UltraAssetTest extends TestCase
             $ultraAssetData['id'],
             $ultraAssetData['weightingHash'],
             $ultraAssetData['title'],
+            $ultraAssetData['description'],
             $ultraAssetData['category'],
             $ultraAssetData['tickerSymbol'],
             $ultraAssetData['numAssets'],
@@ -52,6 +54,7 @@ class UltraAssetTest extends TestCase
         $this->assertSame($ultraAssetData['id'], $sut->id());
         $this->assertSame($ultraAssetData['weightingHash'], $sut->weightingHash());
         $this->assertSame($ultraAssetData['title'], $sut->title());
+        $this->assertSame($ultraAssetData['description'], $sut->description());
         $this->assertSame($ultraAssetData['category'], $sut->category());
         $this->assertSame($ultraAssetData['tickerSymbol'], $sut->tickerSymbol());
         $this->assertSame($ultraAssetData['numAssets'], $sut->numAssets());
@@ -78,6 +81,7 @@ class UltraAssetTest extends TestCase
             1,
             'weightingHash',
             'title',
+            'description',
             'category',
             'tickerSymbol',
             'numAssets',
