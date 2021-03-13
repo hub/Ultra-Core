@@ -19,6 +19,7 @@ class UltraAssetFactoryTest extends TestCase
             'id' => 1,
             'hash' => 'testHash',
             'title' => 'testTitle',
+            'description' => 'testDescription',
             'category' => 'testCategory',
             'ticker_symbol' => 'testTickerSymbol',
             'num_assets' => 11.0,
@@ -38,6 +39,7 @@ class UltraAssetFactoryTest extends TestCase
         $this->assertSame($testUltraAssetRawData['id'], $actualAssetObject->id());
         $this->assertSame($testUltraAssetRawData['hash'], $actualAssetObject->weightingHash());
         $this->assertSame($testUltraAssetRawData['title'], $actualAssetObject->title());
+        $this->assertSame($testUltraAssetRawData['description'], $actualAssetObject->description());
         $this->assertSame($testUltraAssetRawData['category'], $actualAssetObject->category());
         $this->assertSame($testUltraAssetRawData['ticker_symbol'], $actualAssetObject->tickerSymbol());
         $this->assertSame($testUltraAssetRawData['num_assets'], $actualAssetObject->numAssets());
@@ -63,6 +65,7 @@ class UltraAssetFactoryTest extends TestCase
             'id' => 1,
             'hash' => 'testHash',
             'title' => 'testTitle',
+            'description' => 'testDescription',
             'category' => 'testCategory',
             'ticker_symbol' => 'testTickerSymbol',
             'num_assets' => 11.0,
@@ -83,6 +86,7 @@ class UltraAssetFactoryTest extends TestCase
         $this->assertSame($testUltraAssetRawData['id'], $actualAssetObject->id());
         $this->assertSame($testUltraAssetRawData['hash'], $actualAssetObject->weightingHash());
         $this->assertSame($testUltraAssetRawData['title'], $actualAssetObject->title());
+        $this->assertSame($testUltraAssetRawData['description'], $actualAssetObject->description());
         $this->assertSame($testUltraAssetRawData['category'], $actualAssetObject->category());
         $this->assertSame($testUltraAssetRawData['ticker_symbol'], $actualAssetObject->tickerSymbol());
         $this->assertSame($testUltraAssetRawData['num_assets'], $actualAssetObject->numAssets());
