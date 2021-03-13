@@ -1,6 +1,6 @@
 <?php
 /**
- * @author  Tharanga Kothalawala <tharanga.kothalawala@hubculture.com>
+ * @author  Tharanga Kothalawala <tharanga.kothalawala@gmail.com>
  */
 
 namespace Hub\UltraCore\MatchEngine\Order;
@@ -34,29 +34,5 @@ class BuyOrder extends AbstractOrder
         }
 
         return null;
-    }
-
-    /**
-     * Use this to get a pending buy order.
-     *
-     * @param int   $userId       Unique Hub Culture user identifier related to this buy order.
-     * @param int   $assetId      A valid asset identifier
-     * @param float $offeringRate The rate at which the buyer is willing to buy the given asset from a seller.
-     * @param float $amount       Amount of assets being bought originally. Aka number of units.
-     *
-     * @return BuyOrder
-     */
-    public static function newPendingOrder($userId, $assetId, $offeringRate, $amount)
-    {
-        return new self(
-            0,
-            $userId,
-            $assetId,
-            $offeringRate,
-            $amount,
-            0,
-            Orders::STATUS_PENDING,
-            0
-        );
     }
 }

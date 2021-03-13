@@ -1,6 +1,6 @@
 <?php
 /**
- * @author : Tharanga Kothalawala <tharanga.kothalawala@tsk-webdevelopment.com>
+ * @author : Tharanga Kothalawala <tharanga.kothalawala@gmail.com>
  * @date   : 01-07-2018
  */
 
@@ -24,6 +24,7 @@ class UltraAssetFactory
             $asset['id'],
             $asset['hash'],
             $asset['title'],
+            $asset['description'],
             $asset['category'],
             $asset['ticker_symbol'],
             $asset['num_assets'],

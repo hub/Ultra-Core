@@ -1,6 +1,6 @@
 <?php
 /**
- * @author : Tharanga Kothalawala <tharanga.kothalawala@tsk-webdevelopment.com>
+ * @author : Tharanga Kothalawala <tharanga.kothalawala@gmail.com>
  * @date   : 03-06-2018
  */
 
@@ -33,6 +33,7 @@ class UltraAssetsRepository
         'digital_asset' => 'Digital Asset',
         'fiat' => 'Fiat',
         'land' => 'Land',
+        'nature' => 'Nature',
         'object' => 'Object',
         'real_estate' => 'Real Estate',
         'reward' => 'Reward',
@@ -62,9 +63,11 @@ class UltraAssetsRepository
     }
 
     /**
+     * @param array $filters Set of filters to be used when retrieving assets
+     *
      * @return UltraAsset[]
      */
-    public function getAllActiveAssets($filters = array())
+    public function getAllActiveAssets(array $filters = array())
     {
         /** @var \mysqli_result $stmt */
         $stmt = $this->dbConnection->query($this->getUltraAssetRetrievalQuery($filters));
@@ -267,6 +270,8 @@ SQL
     }
 
     /**
+     * An authority level user can attach terms and conditions to an asset. This returns such T&Cs
+     *
      * @param int $assetId Ultra asset unique identifier.
      *
      * @return array
@@ -446,7 +451,9 @@ SQL
     }
 
     /**
-     * @param array $asset
+     * This enriches a given asset an array notation with realtime rates and returns as an UltraAsset
+     *
+     * @param array $asset asset an array notation
      *
      * @return UltraAsset
      */
@@ -459,7 +466,12 @@ SQL
         return $assetObj;
     }
 
-    protected function getUltraAssetRetrievalQuery($filters = array())
+    /**
+     * @param array $filters Set of filters to be used when retrieving assets
+     *
+     * @return string
+     */
+    protected function getUltraAssetRetrievalQuery(array $filters = array())
     {
         $where = ['1'];
         foreach ($filters as $filterName => $filterValue) {

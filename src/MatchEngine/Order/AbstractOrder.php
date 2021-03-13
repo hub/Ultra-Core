@@ -1,6 +1,6 @@
 <?php
 /**
- * @author  Tharanga Kothalawala <tharanga.kothalawala@hubculture.com>
+ * @author  Tharanga Kothalawala <tharanga.kothalawala@gmail.com>
  */
 
 namespace Hub\UltraCore\MatchEngine\Order;
@@ -227,15 +227,6 @@ abstract class AbstractOrder
     }
 
     /**
-     * This matches a given buy and sell order pair.
-     *
-     * @param AbstractOrder $order This can be a sell or a buy order
-     *
-     * @return self
-     */
-    public abstract function match(AbstractOrder $order);
-
-    /**
      * Use this to get a pending order of any kind.
      *
      * @param int   $userId              Unique Hub Culture user identifier related to this buy/sell order.
@@ -245,7 +236,28 @@ abstract class AbstractOrder
      * @param float $amount              Amount of assets being bought originally. Aka number of units
      *                                   Or the amount of assets being sold originally.
      *
+     * @return AbstractOrder|BuyOrder|SellOrder
+     */
+    public static function newPendingOrder($userId, $assetId, $offeringRate, $amount)
+    {
+        return new static(
+            0,
+            $userId,
+            $assetId,
+            $offeringRate,
+            $amount,
+            0,
+            Orders::STATUS_PENDING,
+            0
+        );
+    }
+
+    /**
+     * This matches a given buy and sell order pair.
+     *
+     * @param AbstractOrder $order This can be a sell or a buy order
+     *
      * @return self
      */
-    public abstract static function newPendingOrder($userId, $assetId, $offeringRate, $amount);
+    public abstract function match(AbstractOrder $order);
 }
