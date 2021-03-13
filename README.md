@@ -1,7 +1,5 @@
 # Hub Culture - Ultra Core
 
-https://travis-ci.org/hub/Ultra-core.svg?branch=master
-
 [![Build Status](https://travis-ci.org/hub/Ultra-core.svg?branch=master)](https://travis-ci.org/hub/Ultra-core)
 
 This library is responsible for all the ultra calculations within the ultra exchange and any other ultra trading dashboard.
