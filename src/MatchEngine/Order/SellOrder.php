@@ -35,28 +35,4 @@ class SellOrder extends AbstractOrder
 
         return null;
     }
-
-    /**
-     * Use this to get a pending sell order.
-     *
-     * @param int   $userId       Unique Hub Culture user identifier related to this sell order.
-     * @param int   $assetId      A valid asset identifier
-     * @param float $offeringRate The rate at which the seller is willing to sell the given asset for a buyer.
-     * @param float $amount       Amount of assets being sold originally. Aka number of units.
-     *
-     * @return SellOrder
-     */
-    public static function newPendingOrder($userId, $assetId, $offeringRate, $amount)
-    {
-        return new self(
-            0,
-            $userId,
-            $assetId,
-            $offeringRate,
-            $amount,
-            0,
-            Orders::STATUS_PENDING,
-            0
-        );
-    }
 }
