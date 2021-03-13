@@ -1,6 +1,6 @@
 <?php
 /**
- * @author  Tharanga Kothalawala <tharanga.kothalawala@hubculture.com>
+ * @author  Tharanga Kothalawala <tharanga.kothalawala@gmail.com>
  */
 
 namespace Hub\UltraCore\MatchEngine;

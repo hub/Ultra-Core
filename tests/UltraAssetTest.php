@@ -1,6 +1,6 @@
 <?php
 /**
- * @author : Tharanga Kothalawala <tharanga.kothalawala@tsk-webdevelopment.com>
+ * @author : Tharanga Kothalawala <tharanga.kothalawala@gmail.com>
  * @date   : 27/06/2018
  */
 
@@ -112,6 +112,7 @@ class UltraAssetTest extends TestCase
             '_',
             '_',
             '_',
+            '_',
             0,
             'backgroundImage.jpg',
             'iconImage',
@@ -129,6 +130,7 @@ class UltraAssetTest extends TestCase
 
         $sut = new UltraAsset(
             0,
+            '_',
             '_',
             '_',
             '_',

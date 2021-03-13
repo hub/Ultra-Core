@@ -1,6 +1,6 @@
 <?php
 /**
- * @author : Tharanga Kothalawala <tharanga.kothalawala@tsk-webdevelopment.com>
+ * @author : Tharanga Kothalawala <tharanga.kothalawala@gmail.com>
  * @date   : 03-06-2018
  */
 
