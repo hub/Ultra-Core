@@ -31,7 +31,7 @@ class UltraAssetsRepository
     public static $availableAssetCategories = array(
         'art' => 'Art',
         'digital_asset' => 'Digital Asset',
-        'fiat' => 'Fiat',
+        'fiat' => 'Stablecoin',
         'land' => 'Land',
         'nature' => 'Nature',
         'object' => 'Object',
