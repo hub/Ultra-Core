@@ -241,6 +241,10 @@ class DefaultWalletHandler implements WalletHandler
      */
     private function getVenAmountForOneAsset(UltraAsset $asset)
     {
+        if ($asset->weightingType() == 'custom_ven_amount' && !empty($asset->getCustomVenAmount())) {
+            return floatval($asset->getCustomVenAmount());
+        }
+
         $weightings = $asset->weightings();
 
         /**
