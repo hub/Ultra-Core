@@ -49,6 +49,9 @@ class UltraAsset
     /** @var UltraAssetWeighting[] */
     private $weightings;
 
+    /** @var float */
+    private $customVenAmount;
+
     /** @var string */
     private $submissionDate;
 
@@ -69,6 +72,7 @@ class UltraAsset
      * @param int                   $authorityUserId
      * @param string                $weightingType
      * @param UltraAssetWeighting[] $weightings
+     * @param float                 $customVenAmount
      * @param string                $submissionDate
      */
     public function __construct(
@@ -86,6 +90,7 @@ class UltraAsset
         $authorityUserId,
         $weightingType,
         array $weightings,
+        $customVenAmount,
         $submissionDate
     ) {
         $this->id = $id;
@@ -102,6 +107,7 @@ class UltraAsset
         $this->authorityUserId = intval($authorityUserId);
         $this->weightingType = $weightingType;
         $this->weightings = $weightings;
+        $this->customVenAmount = $customVenAmount;
         $this->submissionDate = $submissionDate;
     }
 
@@ -298,6 +304,17 @@ class UltraAsset
         }
 
         return json_encode($weightings);
+    }
+
+    /**
+     * This value is set for assets which are not weighted by other currencies.
+     * This will be a custom authority secified amount which they think how much this asset would be valued in VEN
+     *
+     * @return float
+     */
+    public function getCustomVenAmount()
+    {
+        return $this->customVenAmount;
     }
 
     /**

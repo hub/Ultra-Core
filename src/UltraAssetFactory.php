@@ -35,6 +35,7 @@ class UltraAssetFactory
             $asset['user_id'],
             $asset['weighting_type'],
             self::extractAssetWeightings($asset['weightings'], $asset['weighting_type'], $explicitVenAmount),
+            $asset['explicit_ven_amount'],
             $asset['created_at']
         );
     }

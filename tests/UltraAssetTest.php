@@ -31,6 +31,7 @@ class UltraAssetTest extends TestCase
             'authorityUserId' => 14795,
             'weightingType' => 'weightingType',
             'weightings' => array($testWeighting),
+            'explicit_ven_amount' => 16,
             'created_at' => '2000-01-01 00:00:00',
         );
         $sut = new UltraAsset(
@@ -48,6 +49,7 @@ class UltraAssetTest extends TestCase
             $ultraAssetData['authorityUserId'],
             $ultraAssetData['weightingType'],
             $ultraAssetData['weightings'],
+            $ultraAssetData['explicit_ven_amount'],
             $ultraAssetData['created_at']
         );
 
@@ -67,6 +69,7 @@ class UltraAssetTest extends TestCase
         $this->assertSame($ultraAssetData['weightings'], $sut->weightings());
         $this->assertSame(true, $sut->isWithOneWeighting());
         $this->assertSame($testWeighting, $sut->getAssetWeightingByPercentage());
+        $this->assertSame($ultraAssetData['explicit_ven_amount'], $sut->getCustomVenAmount());
         $this->assertSame($ultraAssetData['created_at'], $sut->submissionDate());
     }
 
@@ -92,6 +95,7 @@ class UltraAssetTest extends TestCase
             'authorityUserId',
             'weightingType',
             array($testWeighting1, $testWeighting2),
+            0,
             'created_at'
         );
 
@@ -121,6 +125,7 @@ class UltraAssetTest extends TestCase
             0,
             '_',
             array(),
+            0,
             '_'
         );
 
@@ -143,6 +148,7 @@ class UltraAssetTest extends TestCase
             0,
             '_',
             array(),
+            0,
             '_'
         );
 
