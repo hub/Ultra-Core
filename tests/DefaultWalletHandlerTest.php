@@ -271,6 +271,7 @@ class DefaultWalletHandlerTest extends TestCase
         $assetMock->shouldReceive('tickerSymbol')->once()->andReturn('uTICK');
         // NOTE: Please note that a a custom ven amount based asset pricing is configured below.
         $assetMock->shouldReceive('weightingType')->once()->andReturn(UltraAssetsRepository::TYPE_VEN_AMOUNT);
+        $assetMock->shouldReceive('getCustomVenAmount')->once()->andReturn($testVenAmountForOneAsset);
         $assetMock->shouldReceive('isWithOneWeighting')->once()->andReturn(true);
 
         // Exchange
@@ -309,6 +310,7 @@ class DefaultWalletHandlerTest extends TestCase
         $orderRepoMock = Mockery::mock(OrderRepository::class);
         $orderRepoMock
             ->shouldReceive('addBuyOrder')
+            ->once()
             ->with(
                 Mockery::on(function (BuyOrder $argument) use (
                     $testPurchaseAssetAmount,

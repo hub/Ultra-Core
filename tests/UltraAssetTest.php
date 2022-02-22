@@ -99,6 +99,7 @@ class UltraAssetTest extends TestCase
             'weightingType',
             array($testWeighting1, $testWeighting2),
             0,
+            '[]',
             'created_at'
         );
 
@@ -129,6 +130,7 @@ class UltraAssetTest extends TestCase
             '_',
             array(),
             0,
+            '_',
             '_'
         );
 
@@ -152,6 +154,7 @@ class UltraAssetTest extends TestCase
             '_',
             array(),
             0,
+            '_',
             '_'
         );
 

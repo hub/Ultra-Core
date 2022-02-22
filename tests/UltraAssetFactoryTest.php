@@ -54,7 +54,7 @@ class UltraAssetFactoryTest extends TestCase
         $this->assertSame('testBaseCurrencyTicker', $actualAssetObject->weightings()[0]->currencyName());
         $this->assertSame(0, $actualAssetObject->weightings()[0]->currencyAmount());
         $this->assertSame(100, $actualAssetObject->weightings()[0]->percentage());
-        $this->assertSame(12.0, $actualAssetObject->getCustomVenAmount());
+        $this->assertSame(12, $actualAssetObject->getCustomVenAmount());
         $this->assertSame($testUltraAssetRawData['geofence_coordinates'], $actualAssetObject->getGeoFenceCoordinates());
         $this->assertSame($testUltraAssetRawData['created_at'], $actualAssetObject->submissionDate());
     }
@@ -104,7 +104,7 @@ class UltraAssetFactoryTest extends TestCase
         $this->assertSame('Ven', $actualAssetObject->weightings()[0]->currencyName());
         $this->assertSame(12.0, $actualAssetObject->weightings()[0]->currencyAmount());
         $this->assertSame(100, $actualAssetObject->weightings()[0]->percentage());
-        $this->assertSame(12.0, $actualAssetObject->getCustomVenAmount());
+        $this->assertSame(12, $actualAssetObject->getCustomVenAmount());
         $this->assertSame($testUltraAssetRawData['geofence_coordinates'], $actualAssetObject->getGeoFenceCoordinates());
         $this->assertSame($testUltraAssetRawData['created_at'], $actualAssetObject->submissionDate());
     }
