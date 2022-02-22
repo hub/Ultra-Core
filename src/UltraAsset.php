@@ -53,6 +53,9 @@ class UltraAsset
     private $customVenAmount;
 
     /** @var string */
+    private $geoFenceCoordinates;
+
+    /** @var string */
     private $submissionDate;
 
     /**
@@ -73,6 +76,7 @@ class UltraAsset
      * @param string                $weightingType
      * @param UltraAssetWeighting[] $weightings
      * @param float                 $customVenAmount
+     * @param string                $geoFenceCoordinates
      * @param string                $submissionDate
      */
     public function __construct(
@@ -91,6 +95,7 @@ class UltraAsset
         $weightingType,
         array $weightings,
         $customVenAmount,
+        $geoFenceCoordinates,
         $submissionDate
     ) {
         $this->id = $id;
@@ -108,6 +113,7 @@ class UltraAsset
         $this->weightingType = $weightingType;
         $this->weightings = $weightings;
         $this->customVenAmount = $customVenAmount;
+        $this->geoFenceCoordinates = $geoFenceCoordinates;
         $this->submissionDate = $submissionDate;
     }
 
@@ -308,13 +314,22 @@ class UltraAsset
 
     /**
      * This value is set for assets which are not weighted by other currencies.
-     * This will be a custom authority secified amount which they think how much this asset would be valued in VEN
+     * This will be a custom authority specified amount which they think how much this asset would be valued in VEN
      *
      * @return float
      */
     public function getCustomVenAmount()
     {
         return $this->customVenAmount;
+    }
+
+    /**
+     * This identifies the GPS GEO coordinate values for a land type ULTRA asset within the exchange.
+     * @return string
+     */
+    public function getGeoFenceCoordinates()
+    {
+        return $this->geoFenceCoordinates;
     }
 
     /**
