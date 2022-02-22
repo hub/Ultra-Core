@@ -32,6 +32,7 @@ class UltraAssetTest extends TestCase
             'weightingType' => 'weightingType',
             'weightings' => array($testWeighting),
             'explicit_ven_amount' => 16,
+            'geofence_coordinates' => '[]',
             'created_at' => '2000-01-01 00:00:00',
         );
         $sut = new UltraAsset(
@@ -50,6 +51,7 @@ class UltraAssetTest extends TestCase
             $ultraAssetData['weightingType'],
             $ultraAssetData['weightings'],
             $ultraAssetData['explicit_ven_amount'],
+            $ultraAssetData['geofence_coordinates'],
             $ultraAssetData['created_at']
         );
 
@@ -70,6 +72,7 @@ class UltraAssetTest extends TestCase
         $this->assertSame(true, $sut->isWithOneWeighting());
         $this->assertSame($testWeighting, $sut->getAssetWeightingByPercentage());
         $this->assertSame($ultraAssetData['explicit_ven_amount'], $sut->getCustomVenAmount());
+        $this->assertSame($ultraAssetData['geofence_coordinates'], $sut->getGeoFenceCoordinates());
         $this->assertSame($ultraAssetData['created_at'], $sut->submissionDate());
     }
 
@@ -96,6 +99,7 @@ class UltraAssetTest extends TestCase
             'weightingType',
             array($testWeighting1, $testWeighting2),
             0,
+            '[]',
             'created_at'
         );
 
@@ -126,6 +130,7 @@ class UltraAssetTest extends TestCase
             '_',
             array(),
             0,
+            '_',
             '_'
         );
 
@@ -149,6 +154,7 @@ class UltraAssetTest extends TestCase
             '_',
             array(),
             0,
+            '_',
             '_'
         );
 
