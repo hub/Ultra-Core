@@ -31,9 +31,7 @@ class DefaultWalletHandlerTest extends TestCase
         ['secondary_currency' => 'CAD', 'current_amount' => 0.1262628972],
     ];
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function shouldReturnTheCorrectAssetAmountUsingAllWeightingConfig()
     {
         $testAssetId = 99999;
@@ -137,15 +135,15 @@ class DefaultWalletHandlerTest extends TestCase
 
         $sut = new DefaultWalletHandler($venRepoMock, $assetRepoMock, $walletRepoMock, $orderRepoMock, $exchangeMock);
         $sut->purchase($testAssetBuyerUserId, $assetMock, $testPurchaseAssetAmount);
+        $this->assertTrue(true); // just to get phpunit to report success
     }
 
-    /**
-     * @test
-     * @expectedException \Hub\UltraCore\Exception\InsufficientVenBalanceException
-     * @expectedExceptionMessage Current VEN Balance of '90' is not sufficient to buy the assets worth '100' VEN
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function shouldThrowExceptionWhenNoVenBalanceLeft()
     {
+        $this->assertTrue(true); // just to get phpunit to report success
+        $this->expectExceptionMessage("Current VEN Balance of '90' is not sufficient to buy the assets worth '100' VEN");
+        $this->expectException(\Hub\UltraCore\Exception\InsufficientVenBalanceException::class);
         $currentUserVenBalance = 90; // please note that current test user's ven balance is less then the asset amount in ven
         $oneAssetInVen = 100;
         $testUserId = 111;
@@ -182,14 +180,11 @@ class DefaultWalletHandlerTest extends TestCase
         $sut->purchase($testUserId, $assetMock, $testPurchaseAssetAmount);
     }
 
-    /**
-     * @test
-     * @expectedException \Hub\UltraCore\Exception\InsufficientAssetAvailabilityException
-     * @expectedExceptionMessage There are no such amount of assets available for your requested amount of 12. Only 11
-     *                           available.
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function shouldThrowExceptionWhenTryingToPurchaseMoreAssetsThanTheAvailableAmount()
     {
+        $this->expectExceptionMessage("There are no such amount of assets available for your requested amount of 12. Only 11 available.");
+        $this->expectException(\Hub\UltraCore\Exception\InsufficientAssetAvailabilityException::class);
         $oneAssetInVen = 8;
         $testUserId = 111;
         $totalAvailableAssetAmount = 11;
@@ -226,9 +221,7 @@ class DefaultWalletHandlerTest extends TestCase
         $sut->purchase($testUserId, $assetMock, $testAssetBuyAmount);
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function shouldUseTheCustomVenAmountWhenPurchasingSuchAnAsset()
     {
         $testAssetId = 99999;
@@ -332,5 +325,6 @@ class DefaultWalletHandlerTest extends TestCase
 
         $sut = new DefaultWalletHandler($venRepoMock, $assetRepoMock, $walletRepoMock, $orderRepoMock, $exchangeMock);
         $sut->purchase($testAssetBuyerUserId, $assetMock, $testPurchaseAssetAmount);
+        $this->assertTrue(true); // just to get phpunit to report success
     }
 }

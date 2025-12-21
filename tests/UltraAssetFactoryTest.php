@@ -10,9 +10,7 @@ use PHPUnit\Framework\TestCase;
 
 class UltraAssetFactoryTest extends TestCase
 {
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function shouldCreateUltraAssetObjectWithAllTheWeightings()
     {
         $testUltraAssetRawData = array(
@@ -59,10 +57,7 @@ class UltraAssetFactoryTest extends TestCase
         $this->assertSame($testUltraAssetRawData['created_at'], $actualAssetObject->submissionDate());
     }
 
-
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function shouldCreateUltraAssetObjectWithOneWeightingForNonCurrencyCombinations()
     {
         $testUltraAssetRawData = array(
@@ -109,9 +104,7 @@ class UltraAssetFactoryTest extends TestCase
         $this->assertSame($testUltraAssetRawData['created_at'], $actualAssetObject->submissionDate());
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function shouldReturnEmptyArrayWhenCurrencyJsonStringNotValidJson()
     {
         $actualWeightings = UltraAssetFactory::extractAssetWeightings(
@@ -121,9 +114,7 @@ class UltraAssetFactoryTest extends TestCase
         $this->assertEmpty($actualWeightings);
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function shouldReturnVenWeightingAsPerVenAmountGiven()
     {
         $actualWeightings = UltraAssetFactory::extractAssetWeightings(
@@ -137,9 +128,7 @@ class UltraAssetFactoryTest extends TestCase
         );
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function shouldReturnCorrectWeightingsAsPerJsonString()
     {
         $actualWeightings = UltraAssetFactory::extractAssetWeightings(

@@ -10,9 +10,7 @@ use PHPUnit\Framework\TestCase;
 
 class UltraAssetTest extends TestCase
 {
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function shouldReturnInstantiatedValuesWithOneWeighting()
     {
         $testWeighting = new UltraAssetWeighting('currencyName', 23.123456, 100);
@@ -76,9 +74,7 @@ class UltraAssetTest extends TestCase
         $this->assertSame($ultraAssetData['created_at'], $sut->submissionDate());
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function shouldReturnCorrectWeightingData()
     {
         $testWeighting1 = new UltraAssetWeighting('currencyName1', 11.123456, 80);
@@ -109,9 +105,7 @@ class UltraAssetTest extends TestCase
         $this->assertNull($sut->getAssetWeightingByPercentage()); // no base currency with 100% weighting
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function shouldReturnRequestedImageUrls()
     {
         $sut = new UltraAsset(

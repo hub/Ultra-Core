@@ -21,7 +21,7 @@ class ExchangeTest extends TestCase
      */
     private $sut;
 
-    public function setUp()
+    protected function setUp(): void
     {
         /**
          * @var array currency exchange rates taken by the ven api as of today (2019-08-18).
@@ -44,11 +44,11 @@ class ExchangeTest extends TestCase
 
     /**
      * Let's get the amount in VEN for 1 USD
-     * @dataProvider getOtherCurrencies
      *
      * @param Money  $fromOtherMoney
      * @param string $expectedVenAmount
      */
+    #[\PHPUnit\Framework\Attributes\DataProvider('getOtherCurrencies')]
     public function testConversionToVen(Money $fromOtherMoney, $expectedVenAmount)
     {
         $actualVenMoney = $this->sut->convertToVen($fromOtherMoney);
@@ -60,7 +60,7 @@ class ExchangeTest extends TestCase
     /**
      * @return array
      */
-    public function getOtherCurrencies()
+    public static function getOtherCurrencies()
     {
         return [
             // Let's get the amount in VEN for 1 USD
@@ -74,13 +74,13 @@ class ExchangeTest extends TestCase
 
     /**
      * Let's get the amount in other currencies for 50 VEN
-     * @dataProvider getVenAmount
      *
      * @param float  $venAmount
      * @param string $otherCurrencySymbol
      * @param string $expectedOtherCurrency
      * @param int    $precision
      */
+    #[\PHPUnit\Framework\Attributes\DataProvider('getVenAmount')]
     public function testConversionFromVenToOtherCurrencies(
         $venAmount,
         $otherCurrencySymbol,
@@ -98,7 +98,7 @@ class ExchangeTest extends TestCase
     /**
      * @return array
      */
-    public function getVenAmount()
+    public static function getVenAmount()
     {
         return [
             // 1 Ven = 0.0986845216 USD
