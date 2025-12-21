@@ -14,9 +14,7 @@ class RandomIssuerSelectionStrategyTest extends TestCase
 {
     const TEST_BUY_AMOUNT = 90;
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function shouldUseTheInnerStrategyWhenWeDoNotHaveOneIssuerWhoCanSupplyTheRequestedQuantity()
     {
         $expectedIssuers = array(array('expected'), array('issuers'));
@@ -32,9 +30,7 @@ class RandomIssuerSelectionStrategyTest extends TestCase
         $this->assertEquals($expectedIssuers, $issuers);
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function shouldSendTheFirstIssuerWeFoundWhoHasGotSupplyForTheRequestedQuantity()
     {
         $expectedIssuer = new AssetIssuerAuthority(1, 100, 91, 90);

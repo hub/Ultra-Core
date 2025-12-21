@@ -14,27 +14,26 @@ use Hub\UltraCore\Wallet\WalletRepository;
 use PHPUnit\Framework\TestCase;
 use PHPUnit_Framework_MockObject_MockObject;
 
-class TradingOrderMatcherTest extends TestCase
+final class TradingOrderMatcherTest extends TestCase
 {
     /**
-     * @test
-     * @dataProvider testOrderProvider
-     *
      * @param Orders $actualUserPlacesOrders
      * @param Orders $expectedMatchedOrders
      */
-    public function shouldMatchOrders(Orders $actualUserPlacesOrders, Orders $expectedMatchedOrders)
+    #[\PHPUnit\Framework\Attributes\Test]
+    #[\PHPUnit\Framework\Attributes\DataProvider('orderDataProvider')]
+    public function testShouldMatchOrders(Orders $actualUserPlacesOrders, Orders $expectedMatchedOrders)
     {
         /** @var PHPUnit_Framework_MockObject_MockObject|Connection $connectionMock */
         $connectionMock = $this->getMockBuilder(Connection::class)->disableOriginalConstructor()->getMock();
-        $connectionMock->method('query');
+//        $connectionMock->method('query');
         /** @var PHPUnit_Framework_MockObject_MockObject|WalletRepository $walletRepositoryMock */
         $walletRepositoryMock = $this->getMockBuilder(WalletRepository::class)->disableOriginalConstructor()->getMock();
 
         /** @var PHPUnit_Framework_MockObject_MockObject|OrderRepository $ordersProviderMock */
         $ordersProviderMock = $this->getMockBuilder(OrderRepository::class)->disableOriginalConstructor()->getMock();
         $ordersProviderMock->method('getPendingOrders')->willReturn($actualUserPlacesOrders);
-        $ordersProviderMock->method('getSettlementsLoggedAfterId')->willReturn([]);
+//        $ordersProviderMock->method('getSettlementsLoggedAfterId')->willReturn([]);
 
         $sut = new TradingOrderMatcher($ordersProviderMock, $walletRepositoryMock);
         $matchedOrders = $sut->match();
@@ -43,10 +42,7 @@ class TradingOrderMatcherTest extends TestCase
         $this->assertEquals($expectedMatchedOrders->getSellOrders(), $matchedOrders->getSellOrders());
     }
 
-    /**
-     * @return array
-     */
-    public function testOrderProvider()
+    public static function orderDataProvider(): array
     {
         $testAsset = 1; // ex: uUSD
         return [

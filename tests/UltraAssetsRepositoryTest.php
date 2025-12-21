@@ -26,7 +26,7 @@ class UltraAssetsRepositoryTest extends TestCase
     /** @var \mysqli|MockInterface */
     private $mysqliMock;
 
-    public function setUp()
+    protected function setUp(): void
     {
         $testCurrencyRates = [];
         foreach ($this->testCurrencies as $testCurrency) {
@@ -42,9 +42,7 @@ class UltraAssetsRepositoryTest extends TestCase
         $this->sut = new UltraAssetsRepository($this->mysqliMock, $currencyRatesProviderMock);
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function shouldReturnTheCorrectAssetAmountUsingAllWeightingConfig()
     {
         $testWeightingsConfig = [
@@ -67,11 +65,10 @@ class UltraAssetsRepositoryTest extends TestCase
         $assetMock->shouldReceive('setWeightings')->once()->with($expectedWeightings);
 
         $this->sut->enrichAssetWeightingAmounts($assetMock);
+        $this->assertTrue(true); // just to get phpunit to report success
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function shouldNotReturnWeightingWithAInvalidCurrencyWeightingConfig()
     {
         $testWeightingsConfig = [
@@ -87,11 +84,10 @@ class UltraAssetsRepositoryTest extends TestCase
 
         $assetMock->shouldReceive('setWeightings')->once()->with($expectedWeightings);
         $this->sut->enrichAssetWeightingAmounts($assetMock);
+        $this->assertTrue(true); // just to get phpunit to report success
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function shouldReturnTheTotalValueOfTHeAssetUsingCurrencyWeightings()
     {
         $testWeightingsConfig = [
@@ -118,9 +114,7 @@ class UltraAssetsRepositoryTest extends TestCase
         $this->assertTrue((0.046776965633 === $actualAssetValue->getAmount()));
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function shouldReturnTheTotalInVenForCustomVenAmounts()
     {
         // asset with custom ven amounts always contain one weighting

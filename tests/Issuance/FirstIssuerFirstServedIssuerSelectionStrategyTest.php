@@ -19,12 +19,11 @@ class FirstIssuerFirstServedIssuerSelectionStrategyTest extends TestCase
     const TEST_BUY_AMOUNT = 90;
 
     /**
-     * @test
-     * @dataProvider ultraIssuanceDataProvider
-     *
      * @param array $testUltraIssuanceRecords
      * @param array $expectedIssuers
      */
+    #[\PHPUnit\Framework\Attributes\Test]
+    #[\PHPUnit\Framework\Attributes\DataProvider('ultraIssuanceDataProvider')]
     public function shouldDeductFromAllIssuersAsTheyHaveAvailableAssets(
         array $testUltraIssuanceRecords,
         array $expectedIssuers
@@ -37,7 +36,7 @@ class FirstIssuerFirstServedIssuerSelectionStrategyTest extends TestCase
         $this->assertEquals($expectedIssuers, $issuers);
     }
 
-    public function ultraIssuanceDataProvider()
+    public static function ultraIssuanceDataProvider()
     {
         $issuer1 = array('user_id' => 1, 'original_quantity_issued' => 100, 'remaining_asset_quantity' => 50);
         $issuer2 = array('user_id' => 2, 'original_quantity_issued' => 100, 'remaining_asset_quantity' => 20);

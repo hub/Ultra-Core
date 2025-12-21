@@ -11,11 +11,11 @@ use PHPUnit\Framework\TestCase;
 class UltraAssetWeightingTest extends TestCase
 {
     /**
-     * @test
-     * @dataProvider provideConditions
      * @param array $data
      * @param bool $expectedIsApproved
      */
+    #[\PHPUnit\Framework\Attributes\Test]
+    #[\PHPUnit\Framework\Attributes\DataProvider('provideConditions')]
     public function shouldReturnInstantiatedValuesAllTheTime(array $data)
     {
         $assetWeighting = new UltraAssetWeighting(
@@ -34,7 +34,7 @@ class UltraAssetWeightingTest extends TestCase
     /**
      * @return array
      */
-    public function provideConditions()
+    public static function provideConditions()
     {
         return array(
             array(
