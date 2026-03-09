@@ -124,7 +124,8 @@ class OrderRepository
 
         $buyOrders = [];
         $sellOrders = [];
-        while ($order = $resultSet->fetch(PDO::FETCH_ASSOC)) {
+        // while ($order = $resultSet->fetch(PDO::FETCH_ASSOC)) {
+        while ($order = $resultSet->fetchAssociative()) {
             try {
                 if ($order['type'] === Orders::TYPE_PURCHASE) {
                     $buyOrders[] = new BuyOrder(
