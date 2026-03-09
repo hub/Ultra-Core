@@ -340,7 +340,8 @@ class OrderRepository
             return null;
         }
 
-        return intval($resultSet->fetchColumn(0));
+        // return intval($resultSet->fetchColumn(0));
+        return (int) $resultSet->fetchOne();
     }
 
     /**
