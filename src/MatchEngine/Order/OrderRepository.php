@@ -6,10 +6,10 @@
 namespace Hub\UltraCore\MatchEngine\Order;
 
 use Doctrine\DBAL\Connection;
-use Doctrine\DBAL\DBALException;
+use Doctrine\DBAL\Exception as DBALException;
+use Doctrine\DBAL\ParameterType;
 use Hub\UltraCore\UltraAssetsRepository;
 use InvalidArgumentException;
-use PDO;
 use Psr\Log\LoggerInterface;
 
 class OrderRepository
@@ -114,7 +114,7 @@ class OrderRepository
     public function getPendingOrders()
     {
         try {
-            $resultSet = $this->database->query("SELECT * FROM `ultra_custom_buy_sell_orders` WHERE `status` = 'pending'");
+            $resultSet = $this->database->executeQuery("SELECT * FROM `ultra_custom_buy_sell_orders` WHERE `status` = 'pending'");
         } catch (DBALException $e) {
             $this->logger->error(
                 sprintf('Error occurred when retrieving unsettled buy/sell orders. Error : %s', $e->getMessage())
@@ -174,7 +174,7 @@ class OrderRepository
                         'settled_amount_so_far' => $buyOrder->getSettledAmountSoFar(),
                     ],
                     ['id' => $buyOrder->getId()],
-                    ['settled_amount_so_far' => PDO::PARAM_INT, 'status' => PDO::PARAM_STR]
+                    ['settled_amount_so_far' => ParameterType::STRING, 'status' => ParameterType::STRING]
                 );
             }
 
@@ -195,7 +195,7 @@ class OrderRepository
                         'settled_amount_so_far' => $sellOrder->getSettledAmountSoFar(),
                     ],
                     ['id' => $sellOrder->getId()],
-                    ['settled_amount_so_far' => PDO::PARAM_INT, 'status' => PDO::PARAM_STR]
+                    ['settled_amount_so_far' => ParameterType::STRING, 'status' => ParameterType::STRING]
                 );
             }
         } catch (DBALException $e) {
@@ -219,7 +219,7 @@ class OrderRepository
         }
 
         try {
-            $this->database->query("UPDATE `ultra_custom_buy_sell_orders` SET `num_match_attempts` = `num_match_attempts` + 1 WHERE `id` = {$orderId}");
+            $this->database->executeStatement("UPDATE `ultra_custom_buy_sell_orders` SET `num_match_attempts` = `num_match_attempts` + 1 WHERE `id` = {$orderId}");
         } catch (DBALException $e) {
             $this->logger->error(sprintf(
                 'Error occurred when increment the match attempt for order [%d]. Error : %s',
@@ -249,7 +249,7 @@ class OrderRepository
                     'notes' => $notes,
                 ],
                 ['id' => $orderId],
-                ['status' => PDO::PARAM_STR, 'notes' => PDO::PARAM_STR]
+                ['status' => ParameterType::STRING, 'notes' => ParameterType::STRING]
             );
             $this->logger->info(sprintf("Marked the order [%d] as 'rejected'", $orderId), [__CLASS__]);
         } catch (DBALException $e) {
@@ -282,7 +282,7 @@ class OrderRepository
                     'notes' => $notes,
                 ],
                 ['id' => $orderId],
-                ['status' => PDO::PARAM_STR, 'notes' => PDO::PARAM_STR]
+                ['status' => ParameterType::STRING, 'notes' => ParameterType::STRING]
             );
             $this->logger->info(sprintf("Marked the order [%d] as 'processed'", $orderId), [__CLASS__]);
         } catch (DBALException $e) {
@@ -312,7 +312,7 @@ class OrderRepository
                     'asset_amount' => $settleAmount,
                     'created_at' => date('Y-m-d H:i:s'),
                 ],
-                ['order_id' => PDO::PARAM_INT, 'matched_order_id' => PDO::PARAM_INT, 'asset_amount' => PDO::PARAM_INT]
+                ['order_id' => ParameterType::INTEGER, 'matched_order_id' => ParameterType::INTEGER, 'asset_amount' => ParameterType::STRING]
             );
         } catch (DBALException $e) {
             $this->logger->error(sprintf(
@@ -333,7 +333,7 @@ class OrderRepository
     public function lastSettlementId()
     {
         try {
-            $resultSet = $this->database->query('SELECT MAX(id) AS `id` FROM `ultra_custom_buy_sell_order_settlements`');
+            $resultSet = $this->database->executeQuery('SELECT MAX(id) AS `id` FROM `ultra_custom_buy_sell_order_settlements`');
         } catch (DBALException $e) {
             $this->logger->error(sprintf(
                 'Error occurred when querying the last settlement data. Error : %s', $e->getMessage()
@@ -355,7 +355,7 @@ class OrderRepository
     public function getSettledOrderPairsLoggedAfterId($lastSettlementId)
     {
         try {
-            $resultSet = $this->database->query(<<<SQL
+            $resultSet = $this->database->executeQuery(<<<SQL
 SELECT
     o.id AS `main_order_id`,
     o.user_id AS `main_order_user_id`,
@@ -390,7 +390,7 @@ SQL
         }
 
         $settleOrderPairs = [];
-        while ($row = $resultSet->fetch(PDO::FETCH_ASSOC)) {
+        while ($row = $resultSet->fetchAssociative()) {
             $buyOrder = null;
             $sellOrder = null;
             if ($row['main_order_type'] === Orders::TYPE_PURCHASE) {
