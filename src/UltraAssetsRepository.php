@@ -96,8 +96,8 @@ class UltraAssetsRepository
         }
 
         /** @var \mysqli_result $stmt */
-        $stmt = $this->dbConnection->query("SELECT * FROM ultra_assets WHERE id = {$assetId}");
-        if ($stmt->num_rows === 0) {
+        $stmt = $this->dbConnection->query('SELECT * FROM ultra_assets WHERE id = ' . (int)$assetId);
+        if (!$stmt || $stmt->num_rows === 0) {
             return null;
         }
 
@@ -112,8 +112,8 @@ class UltraAssetsRepository
     public function getAssetByTicker($ticker)
     {
         /** @var \mysqli_result $stmt */
-        $stmt = $this->dbConnection->query("SELECT * FROM ultra_assets WHERE ticker_symbol = '{$ticker}'");
-        if ($stmt->num_rows === 0) {
+        $stmt = $this->dbConnection->query("SELECT * FROM ultra_assets WHERE ticker_symbol = '{$this->escape($ticker)}'");
+        if (!$stmt || $stmt->num_rows === 0) {
             return null;
         }
 
@@ -126,6 +126,8 @@ class UltraAssetsRepository
      */
     public function deductTotalAssetQuantityBy($assetId, $quantity)
     {
+        $quantity = (float)$quantity;
+        $assetId = (int)$assetId;
         $this->dbConnection->query("UPDATE ultra_assets SET num_assets = num_assets - {$quantity} WHERE id = {$assetId}");
     }
 
@@ -138,6 +140,9 @@ class UltraAssetsRepository
      */
     public function deductAssetQuantityBy($authorityIssuerId, $assetId, $quantity)
     {
+        $authorityIssuerId = (int)$authorityIssuerId;
+        $assetId = (int)$assetId;
+        $quantity = (float)$quantity;
         $this->dbConnection->query(<<<SQL
 UPDATE `ultra_asset_issuance_history`
     SET `remaining_asset_quantity` = `remaining_asset_quantity` - {$quantity}
@@ -267,7 +272,7 @@ SQL
      */
     public function removeAssetTermRelations($assetId)
     {
-        return $this->dbConnection->query("DELETE FROM `ultra_asset_terms` WHERE `asset_id` = {$assetId}");
+        return $this->dbConnection->query('DELETE FROM `ultra_asset_terms` WHERE `asset_id` = ' . (int)$assetId);
     }
 
     /**
@@ -279,8 +284,8 @@ SQL
      */
     public function getAssetTermRelations($assetId)
     {
-        $stmt = $this->dbConnection->query("SELECT * FROM `ultra_asset_terms` AS pivot INNER JOIN `terms_and_conditions` AS t ON (t.id = pivot.term_id) WHERE pivot.`asset_id` = {$assetId}");
-        if ($stmt->num_rows === 0) {
+        $stmt = $this->dbConnection->query("SELECT * FROM `ultra_asset_terms` AS pivot INNER JOIN `terms_and_conditions` AS t ON (t.id = pivot.term_id) WHERE pivot.`asset_id` = " . (int)$assetId);
+        if (!$stmt || $stmt->num_rows === 0) {
             return array();
         }
 
@@ -304,6 +309,9 @@ SQL
      */
     public function logUltraAssetLaunch($assetId, $issuingUserId, $issuingNewQuantity)
     {
+        $assetId = (int)$assetId;
+        $issuingUserId = (int)$issuingUserId;
+        $issuingNewQuantity = (float)$issuingNewQuantity;
         $this->dbConnection->query(<<<SQL
             INSERT INTO `ultra_asset_issuance_history`
             (`user_id`, `asset_id`, `pending_new_quantity`, `created_at`)
@@ -481,17 +489,18 @@ SQL
             }
 
             switch ($filterName) {
+                // the filters come from the query string: escape strings, cast numbers
                 case 'name':
-                    $where[] = "title = '{$filterValue}'";
+                    $where[] = "title = '{$this->escape($filterValue)}'";
                     break;
                 case 'ticker':
-                    $where[] = "ticker_symbol = '{$filterValue}'";
+                    $where[] = "ticker_symbol = '{$this->escape($filterValue)}'";
                     break;
                 case 'quantitygte':
-                    $where[] = "num_assets >= {$filterValue}";
+                    $where[] = 'num_assets >= ' . (float)$filterValue;
                     break;
                 case 'category':
-                    $where[] = "category = '{$filterValue}'";
+                    $where[] = "category = '{$this->escape($filterValue)}'";
                     break;
             }
         }
@@ -505,5 +514,15 @@ WHERE
     `is_approved` = 1
     AND {$whereStr}
 SQL;
+    }
+
+    /**
+     * @param mixed $value
+     *
+     * @return string the value escaped for a quoted SQL string
+     */
+    private function escape($value)
+    {
+        return $this->dbConnection->real_escape_string((string)$value);
     }
 }
