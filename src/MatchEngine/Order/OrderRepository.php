@@ -8,6 +8,7 @@ namespace Hub\UltraCore\MatchEngine\Order;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception as DBALException;
 use Doctrine\DBAL\ParameterType;
+use Hub\UltraCore\Exception\WalletException;
 use Hub\UltraCore\UltraAssetsRepository;
 use InvalidArgumentException;
 use Psr\Log\LoggerInterface;
@@ -69,6 +70,8 @@ class OrderRepository
                 'Error occurred when saving a new sell order [%s]. Error : %s', (string)$sellOrder,
                 $e->getMessage()
             ));
+            // the member must not be told the order is placed when it wasn't saved
+            throw new WalletException("Your order couldn't be saved. Nothing was placed; please try again.", 0, $e);
         }
     }
 
@@ -105,6 +108,8 @@ class OrderRepository
                 'Error occurred when saving a new buy order [%s]. Error : %s', (string)$buyOrder,
                 $e->getMessage()
             ));
+            // the member must not be told the order is placed when it wasn't saved
+            throw new WalletException("Your order couldn't be saved. Nothing was placed; please try again.", 0, $e);
         }
     }
 
@@ -219,7 +224,7 @@ class OrderRepository
         }
 
         try {
-            $this->database->executeStatement("UPDATE `ultra_custom_buy_sell_orders` SET `num_match_attempts` = `num_match_attempts` + 1 WHERE `id` = {$orderId}");
+            $this->database->executeStatement('UPDATE `ultra_custom_buy_sell_orders` SET `num_match_attempts` = `num_match_attempts` + 1 WHERE `id` = ?', [(int)$orderId]);
         } catch (DBALException $e) {
             $this->logger->error(sprintf(
                 'Error occurred when increment the match attempt for order [%d]. Error : %s',
@@ -355,6 +360,7 @@ class OrderRepository
     public function getSettledOrderPairsLoggedAfterId($lastSettlementId)
     {
         try {
+            $lastSettlementId = (int)$lastSettlementId;
             $resultSet = $this->database->executeQuery(<<<SQL
 SELECT
     o.id AS `main_order_id`,

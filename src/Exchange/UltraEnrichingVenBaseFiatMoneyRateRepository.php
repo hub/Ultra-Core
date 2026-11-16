@@ -60,10 +60,13 @@ class UltraEnrichingVenBaseFiatMoneyRateRepository implements BaseFiatMoneyRateR
         foreach ($assets as $asset) {
             // check to see if we have 100% weighting of a base fiat currency on the current Ultra asset.
             // if so, relate to the corresponding fiat currency itself and continue to the next ultra asset.
+            // Only the u-asset of the currency itself (uUSD for USD) stands for it. Any other asset that happens to be
+            // 100% USD (Dropp, #141, basket "USD 100") is listed under its own ticker below, never as USD.
             $fullBaseWeighting = $asset->getAssetWeightingByPercentage(100);
             if ($asset->isWithOneWeighting()
                 && !is_null($fullBaseWeighting)
                 && !empty($baseExchangeRates[$fullBaseWeighting->currencyName()])
+                && strcasecmp($asset->tickerSymbol(), 'u' . $fullBaseWeighting->currencyName()) === 0
             ) {
                 $baseExchangeRates[$fullBaseWeighting->currencyName()]->setUltraAssetComposedCurrencyCount(1);
                 $baseExchangeRates[$fullBaseWeighting->currencyName()]->setUltraAssetId($asset->id());

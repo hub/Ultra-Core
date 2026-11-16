@@ -6,6 +6,7 @@
 
 namespace Hub\UltraCore\Wallet;
 
+use Hub\UltraCore\Exception\InsufficientBalanceException;
 use Hub\UltraCore\Exception\WalletException;
 use Hub\UltraCore\MatchEngine\MatchedOrderMetaData;
 use Hub\UltraCore\MatchEngine\Order\Orders;
@@ -269,72 +270,90 @@ SQL
      */
     public function credit(Wallet $wallet, $amount, array $metaData)
     {
-        $this->logger->debug(sprintf('Crediting / Adding [%s] to the wallet %d', $amount, $wallet->getId()));
-        $balance = $wallet->getBalance();
-        if (!$this->isPendingTransaction($metaData)) {
-            $balance = $wallet->getBalance() + $amount;
-        }
-
-        $availableBalance = $wallet->getAvailableBalance() + $amount;
-        $userId = $wallet->getUserId();
-        $assetId = $wallet->getAssetId();
-        $this->dbConnection->begin_transaction();
-        $preparedStmt = $this->dbConnection->prepare('UPDATE `wallets` SET `balance` = ?, `available_balance` = ? WHERE `user_id` = ? AND `asset_id` = ?');
-        if (!$preparedStmt) {
-            $this->logger->error("Cannot update the wallet balance. Error : " . $this->dbConnection->error);
-            throw new WalletException("Cannot update the wallet balance");
-        }
-        $preparedStmt->bind_param('ddii', $balance, $availableBalance, $userId, $assetId);
-        $updated = $preparedStmt->execute();
-        $preparedStmt->close();
-        $transactionLogged = false;
-        if ($updated) {
-            $transactionLogged = $this->logTransaction($wallet, $amount, $balance, $metaData);
-        }
-
-        if (!$transactionLogged) {
-            $this->dbConnection->rollback();
-            $this->logger->error("Cannot log the wallet transaction. Error : " . $this->dbConnection->error);
-            throw new WalletException("Cannot log the wallet transaction");
-        }
-
-        $this->dbConnection->commit();
+        $this->move($wallet, $amount, $metaData, 1);
     }
 
     /**
      * @param Wallet $wallet
      * @param float  $amount
      * @param array  $metaData
+     *
+     * @throws InsufficientBalanceException when the wallet's available balance doesn't cover the amount
+     * @throws WalletException
      */
     public function debit(Wallet $wallet, $amount, array $metaData)
     {
-        $this->logger->debug(sprintf('Debiting / Deducting [%s] from the wallet %d', $amount, $wallet->getId()));
-        $balance = $wallet->getBalance();
-        if (!$this->isPendingTransaction($metaData)) {
-            $balance = $wallet->getBalance() - $amount;
-        }
+        $this->move($wallet, $amount, $metaData, -1);
+    }
 
-        $availableBalance = $wallet->getAvailableBalance() - $amount;
+    /**
+     * Credits (+1) or debits (-1) a wallet. The row is locked and re-read inside the transaction, so the new balance
+     * never comes from a stale Wallet object, and a debit is refused when the available balance doesn't cover it.
+     *
+     * @param Wallet $wallet
+     * @param float  $amount positive
+     * @param array  $metaData
+     * @param int    $direction 1 or -1
+     *
+     * @throws InsufficientBalanceException
+     * @throws WalletException
+     */
+    private function move(Wallet $wallet, $amount, array $metaData, $direction)
+    {
+        $amount = (float)$amount;
+        if (!is_finite($amount) || $amount <= 0) {
+            throw new WalletException(sprintf('A wallet amount must be greater than zero(0), got %s', var_export($amount, true)));
+        }
+        $this->logger->debug(sprintf('%s [%s] %s the wallet %d', $direction > 0 ? 'Crediting' : 'Debiting', $amount, $direction > 0 ? 'to' : 'from', $wallet->getId()));
+
         $userId = $wallet->getUserId();
         $assetId = $wallet->getAssetId();
         $this->dbConnection->begin_transaction();
-        $preparedStmt = $this->dbConnection->prepare('UPDATE `wallets` SET `balance` = ?, `available_balance` = ? WHERE `user_id` = ? AND `asset_id` = ?');
-        if (!$preparedStmt) {
-            $this->logger->error("Cannot update the wallet balance. Error : " . $this->dbConnection->error);
-            throw new WalletException("Cannot update the wallet balance");
-        }
-        $preparedStmt->bind_param('ddii', $balance, $availableBalance, $userId, $assetId);
-        $updated = $preparedStmt->execute();
-        $preparedStmt->close();
-        $transactionLogged = false;
-        if ($updated) {
-            $transactionLogged = $this->logTransaction($wallet, $amount * -1, $balance, $metaData);
-        }
+        try {
+            $stmt = $this->dbConnection->prepare('SELECT `balance`, `available_balance` FROM `wallets` WHERE `user_id` = ? AND `asset_id` = ? ORDER BY `id` ASC LIMIT 1 FOR UPDATE');
+            if (!$stmt) {
+                throw new WalletException("Cannot read the wallet balance");
+            }
+            $stmt->bind_param('ii', $userId, $assetId);
+            $stmt->execute();
+            $stmt->bind_result($currentBalance, $currentAvailable);
+            $found = $stmt->fetch();
+            $stmt->close();
+            if (!$found) {
+                throw new WalletException("Cannot find the wallet {$wallet->getId()}");
+            }
 
-        if (!$transactionLogged) {
+            $signed = $direction * $amount;
+            if ($direction < 0 && (float)$currentAvailable < $amount) {
+                throw new InsufficientBalanceException(sprintf(
+                    "The wallet %d has %s available, not enough for %s",
+                    $wallet->getId(),
+                    $currentAvailable,
+                    $amount
+                ));
+            }
+            $balance = (float)$currentBalance;
+            if (!$this->isPendingTransaction($metaData)) {
+                $balance = round($balance + $signed, 4);
+            }
+            $availableBalance = round((float)$currentAvailable + $signed, 4);
+
+            $preparedStmt = $this->dbConnection->prepare('UPDATE `wallets` SET `balance` = ?, `available_balance` = ? WHERE `user_id` = ? AND `asset_id` = ?');
+            if (!$preparedStmt) {
+                throw new WalletException("Cannot update the wallet balance");
+            }
+            $preparedStmt->bind_param('ddii', $balance, $availableBalance, $userId, $assetId);
+            $updated = $preparedStmt->execute();
+            $preparedStmt->close();
+            if (!$updated || !$this->logTransaction($wallet, $signed, $balance, $metaData)) {
+                throw new WalletException("Cannot log the wallet transaction");
+            }
+        } catch (\Exception $e) {
             $this->dbConnection->rollback();
-            $this->logger->error("Cannot log the wallet transaction. Error : " . $this->dbConnection->error);
-            throw new WalletException("Cannot log the wallet transaction");
+            if (!($e instanceof InsufficientBalanceException)) {
+                $this->logger->error($e->getMessage() . ' Error : ' . $this->dbConnection->error);
+            }
+            throw $e;
         }
 
         $this->dbConnection->commit();

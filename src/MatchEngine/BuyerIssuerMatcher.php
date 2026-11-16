@@ -20,6 +20,9 @@ use Psr\Log\LoggerInterface;
 
 class BuyerIssuerMatcher
 {
+    /** A market order fills only within 0.5% of the price the buyer was quoted. */
+    const PRICE_TOLERANCE = 0.005;
+
     /**
      * @var Exchange
      */
@@ -131,6 +134,19 @@ class BuyerIssuerMatcher
             $venAmountForOneAsset = $this->getVenAmountForOneAsset($asset);
             $purchaseAssetAmount = $buyOrder->getAmount();
 
+            // Honour the price the buyer agreed: their limit, or for a market order the price they were quoted
+            // (stored as the offering rate). If the market is now above it, leave the order waiting.
+            $agreedVenPerAsset = (float)$buyOrder->getOfferingRate();
+            if ($agreedVenPerAsset > 0 && $venAmountForOneAsset > $agreedVenPerAsset * (1 + self::PRICE_TOLERANCE)) {
+                $this->logger->info(sprintf(
+                    'Buy order [%d] waits: the price %s is above the agreed %s Ven per asset',
+                    $buyOrder->getId(),
+                    $venAmountForOneAsset,
+                    $agreedVenPerAsset
+                ), [__CLASS__]);
+                continue;
+            }
+
             // ven balance validation : do not let them pay ven they don't have in their balance
             $totalVenAmountForAssets = ($venAmountForOneAsset * $purchaseAssetAmount);
             if ($totalVenAmountForAssets > $venWallet->getBalance()) {
@@ -167,6 +183,15 @@ class BuyerIssuerMatcher
                 $this->logger->warning("No authority issuers found. skipping this order", [__CLASS__]);
                 continue;
             }
+            // the issuers must cover the whole order: never credit assets nobody is selling
+            $covered = 0.0;
+            foreach ($issuers as $issuer) {
+                $covered += $issuer->getSaleableAssetQuantity();
+            }
+            if (round($covered, 4) < round($purchaseAssetAmount, 4)) {
+                $this->logger->warning(sprintf('Issuers cover %s of the %s in buy order [%d]; skipping', $covered, $purchaseAssetAmount, $buyOrder->getId()), [__CLASS__]);
+                continue;
+            }
 
             $weightingConfig = [];
             $weightings = $asset->weightings();
@@ -182,25 +207,37 @@ class BuyerIssuerMatcher
             $metaData['weightingConfig'] = $weightingConfig;
 
             $buyerWallet = $this->walletRepository->getUserWallet($buyOrder->getUserId(), $asset->id());
-            $this->walletRepository->credit($buyerWallet, $buyOrder->getAmount(), $metaData);
 
-            // deduct the number of available assets now as we credited some for this buyer's wallet.
-            $this->ultraAssetsRepository->deductTotalAssetQuantityBy($asset->id(), $buyOrder->getAmount());
+            // Ven first: each sendVen takes the Ven only if the buyer still has it. If one fails, refund the issuers
+            // already paid and reject the order, before any asset moves.
+            $paid = [];
+            try {
+                foreach ($issuers as $issuer) {
+                    $venMessage = "Purchased an amount of {$issuer->getSaleableAssetQuantity()} {$asset->title()} assets @{$venAmountForOneAsset} VEN per 1 {$asset->title()}. Click <a href='/markets/my-wallets/transactions?id={$buyerWallet->getId()}'>here</a> for more info.";
+                    $venAmount = $venAmountForOneAsset * $issuer->getSaleableAssetQuantity();
+                    $this->venRepository->sendVen($buyOrder->getUserId(), $issuer->getAuthorityUserId(), $venAmount, $venMessage);
+                    $paid[] = [$issuer->getAuthorityUserId(), $venAmount];
+                }
+            } catch (\Exception $e) {
+                foreach ($paid as $payment) {
+                    try {
+                        $this->venRepository->sendVen($payment[0], $buyOrder->getUserId(), $payment[1], "Refund: Ultra buy order {$buyOrder->getId()} could not be completed");
+                    } catch (\Exception $refundError) {
+                        $this->logger->critical(sprintf('Refund of %s Ven from %d to %d for buy order [%d] failed: %s', $payment[1], $payment[0], $buyOrder->getUserId(), $buyOrder->getId(), $refundError->getMessage()), [__CLASS__]);
+                    }
+                }
+                $this->orderRepository->rejectOrder($buyOrder->getId(), 'Payment failed: ' . $e->getMessage());
+                continue;
+            }
 
+            // then the assets
+            $this->walletRepository->credit($buyerWallet, $purchaseAssetAmount, $metaData);
+            $this->ultraAssetsRepository->deductTotalAssetQuantityBy($asset->id(), $purchaseAssetAmount);
             foreach ($issuers as $issuer) {
                 $this->ultraAssetsRepository->deductAssetQuantityBy(
                     $issuer->getAuthorityUserId(),
                     $asset->id(),
                     $issuer->getSaleableAssetQuantity()
-                );
-
-                // reduce the amount paid in VEN from the user's VEN account and credit it to the each asset issuer account.
-                $venMessage = "Purchased an amount of {$issuer->getSaleableAssetQuantity()} {$asset->title()} assets @{$venAmountForOneAsset} VEN per 1 {$asset->title()}. Click <a href='/markets/my-wallets/transactions?id={$buyerWallet->getId()}'>here</a> for more info.";
-                $this->venRepository->sendVen(
-                    $buyOrder->getUserId(),
-                    $issuer->getAuthorityUserId(),
-                    ($venAmountForOneAsset * $issuer->getSaleableAssetQuantity()),
-                    $venMessage
                 );
             }
 
@@ -256,22 +293,33 @@ class BuyerIssuerMatcher
             $metaData[MatchedOrderMetaData::VEN_AMOUNT_FOR_ONE_ASSET] = $venAmountForOneAsset;
             $metaData['weightingConfig'] = $weightingConfig;
 
-            $this->walletRepository->debit($sellerWallet, $sellAssetAmount, $metaData);
+            // the seller's assets first (the debit re-checks the balance under a row lock), then the Ven
+            try {
+                $this->walletRepository->debit($sellerWallet, $sellAssetAmount, $metaData);
+            } catch (\Exception $e) {
+                $this->orderRepository->rejectOrder($sellOrder->getId(), $e->getMessage());
+                continue;
+            }
 
-            // let's send this amount to the system user as we couln't
+            $venMessage = "Sold an amount of {$sellAssetAmount} {$asset->title()} assets @{$venAmountForOneAsset} VEN per 1 {$asset->title()}. Click <a href='/markets/my-wallets/transactions?id={$sellerWallet->getId()}'>here</a> for more info.";
+            try {
+                $this->venRepository->sendVen(
+                    MatchEngine::SYSTEM_USER_ID,
+                    $sellOrder->getUserId(),
+                    $totalVenAmountForAssets,
+                    $venMessage
+                );
+            } catch (\Exception $e) {
+                $this->walletRepository->credit($sellerWallet, $sellAssetAmount, $metaData);
+                $this->logger->error(sprintf('Sell order [%d]: Ven payout failed, assets returned: %s', $sellOrder->getId(), $e->getMessage()), [__CLASS__]);
+                continue; // stays pending; retried on the next run
+            }
+
+            // the system user now holds what it bought
             $this->walletRepository->credit(
                 $this->walletRepository->getUserWallet(MatchEngine::SYSTEM_USER_ID, $asset->id()),
                 $sellAssetAmount,
                 $metaData
-            );
-
-            // reduce the amount paid in VEN from the user's VEN account and credit it to the each asset issuer account.
-            $venMessage = "Sold an amount of {$sellAssetAmount} {$asset->title()} assets @{$venAmountForOneAsset} VEN per 1 {$asset->title()}. Click <a href='/markets/my-wallets/transactions?id={$sellerWallet->getId()}'>here</a> for more info.";
-            $this->venRepository->sendVen(
-                MatchEngine::SYSTEM_USER_ID,
-                $sellOrder->getUserId(),
-                $totalVenAmountForAssets,
-                $venMessage
             );
 
             $this->orderRepository->processOrder($sellOrder->getId());
@@ -288,6 +336,11 @@ class BuyerIssuerMatcher
      */
     private function getVenAmountForOneAsset(UltraAsset $asset)
     {
+        // the same price DefaultWalletHandler quotes and checks at the purchase
+        if ($asset->weightingType() == UltraAssetsRepository::TYPE_VEN_AMOUNT && !empty($asset->getCustomVenAmount())) {
+            return floatval($asset->getCustomVenAmount());
+        }
+
         $weightings = $asset->weightings();
 
         /**
