@@ -24,6 +24,16 @@ use Hub\UltraCore\UltraAssetsRepository;
 class UltraEnrichingVenBaseFiatMoneyRateRepository implements BaseFiatMoneyRateRepository
 {
     /**
+     * Currencies whose own Ultra asset isn't named "u" + the currency code.
+     * CARBON (ICE EUA) trades as uCRB, Ven Carbon (asset 19), which is 100% CARBON.
+     * Keep this list short: every other currency needs an exact "u" + code ticker,
+     * so a third-party asset weighted 100% to a currency (Dropp, #141) can't take it over.
+     */
+    const OWN_ASSET_EXCEPTIONS = [
+        'CARBON' => 'uCRB',
+    ];
+
+    /**
      * @var BaseFiatMoneyRateRepository
      */
     private $innerExchangeRateRepository;
@@ -66,7 +76,7 @@ class UltraEnrichingVenBaseFiatMoneyRateRepository implements BaseFiatMoneyRateR
             if ($asset->isWithOneWeighting()
                 && !is_null($fullBaseWeighting)
                 && !empty($baseExchangeRates[$fullBaseWeighting->currencyName()])
-                && strcasecmp($asset->tickerSymbol(), 'u' . $fullBaseWeighting->currencyName()) === 0
+                && self::isOwnAsset($fullBaseWeighting->currencyName(), $asset->tickerSymbol())
             ) {
                 $baseExchangeRates[$fullBaseWeighting->currencyName()]->setUltraAssetComposedCurrencyCount(1);
                 $baseExchangeRates[$fullBaseWeighting->currencyName()]->setUltraAssetId($asset->id());
@@ -89,5 +99,24 @@ class UltraEnrichingVenBaseFiatMoneyRateRepository implements BaseFiatMoneyRateR
         }
 
         return $baseExchangeRates;
+    }
+
+    /**
+     * Whether $ticker is the currency's own Ultra asset: "u" + the code (USD -> uUSD), or
+     * the asset in OWN_ASSET_EXCEPTIONS (CARBON -> uCRB).
+     *
+     * @param string $currency "USD" or "CARBON"
+     * @param string $ticker   "uUSD" or "uCRB"
+     *
+     * @return bool
+     */
+    public static function isOwnAsset($currency, $ticker)
+    {
+        $currency = strtoupper((string)$currency);
+        if (isset(self::OWN_ASSET_EXCEPTIONS[$currency])) {
+            return strcasecmp((string)$ticker, self::OWN_ASSET_EXCEPTIONS[$currency]) === 0;
+        }
+
+        return strcasecmp((string)$ticker, 'u' . $currency) === 0;
     }
 }
