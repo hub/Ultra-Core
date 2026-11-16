@@ -109,14 +109,6 @@ class MatchEngine
                 $sellOrder->getAssetId()
             );
 
-            // let's settle the order in terms of assets. (debit and credit the two user accounts respectively)
-            $metaData = MatchedOrderMetaData::from($orderPair);
-            $this->walletRepository->credit($buyerAssetWallet, $orderPair->getSettledAmount(), $metaData);
-            $this->walletRepository->debit($sellerAssetWallet, $orderPair->getSettledAmount(), $metaData);
-
-            /**
-             * Let's settle the Ven amounts
-             */
             // buyer is willing to buy 1 asset per this much Ven. ex: 1 uUSD = 9.9309 Ven
             $buyerOfferingRateInVen = $buyOrder->getOfferingRate();
             $buyerTotalPayInVen = $buyerOfferingRateInVen * $orderPair->getSettledAmount();
@@ -124,37 +116,53 @@ class MatchEngine
             // while the seller is willing to sell one asset per this much Ven and the rate is always higher
             $sellerOfferingRateInVen = $sellOrder->getOfferingRate();
             $sellerTotalGainInVen = $buyerTotalPayInVen; // seller get the same Ven that buyer paid for it
+            $metaData = MatchedOrderMetaData::from($orderPair);
 
-            // let's send ven from the buyer to the seller as we settle this order in terms of Ven
-            $this->venRepository->sendVen(
-                $buyOrder->getUserId(),
-                $sellOrder->getUserId(),
-                $sellerTotalGainInVen,
-                'An order placed on the ULTRA Exchange'
-            );
+            // Ven first: sendVen takes it only if the buyer has it. Then the assets; if the seller no longer has them,
+            // the Ven goes back. One failed pair never stops the others.
+            try {
+                $this->venRepository->sendVen(
+                    $buyOrder->getUserId(),
+                    $sellOrder->getUserId(),
+                    $sellerTotalGainInVen,
+                    'An order placed on the ULTRA Exchange'
+                );
+            } catch (\Exception $e) {
+                $this->logger->error(sprintf('Settlement of buy order [%d] / sell order [%d]: payment failed, nothing moved: %s', $buyOrder->getId(), $sellOrder->getId(), $e->getMessage()), [__CLASS__]);
+                $this->orderRepository->rejectOrder($buyOrder->getId(), 'Payment failed: ' . $e->getMessage());
+                continue;
+            }
 
-            /**
-             * Each time we have a match means that,
-             * we have found a buyer who is willing to buy paying more than the seller's offered rate.
-             *
-             * This means there is a profit under the carpet that we/system/hub culture can keep.
-             */
+            try {
+                $this->walletRepository->debit($sellerAssetWallet, $orderPair->getSettledAmount(), $metaData);
+            } catch (\Exception $e) {
+                $this->venRepository->sendVen($sellOrder->getUserId(), $buyOrder->getUserId(), $sellerTotalGainInVen, 'Refund: an ULTRA Exchange order could not be settled');
+                $this->logger->error(sprintf('Settlement of sell order [%d]: the seller no longer has the assets; Ven refunded: %s', $sellOrder->getId(), $e->getMessage()), [__CLASS__]);
+                $this->orderRepository->rejectOrder($sellOrder->getId(), $e->getMessage());
+                continue;
+            }
+            $this->walletRepository->credit($buyerAssetWallet, $orderPair->getSettledAmount(), $metaData);
+
             $sellerProfitInVen = $buyerTotalPayInVen - ($sellerOfferingRateInVen * $orderPair->getSettledAmount());
             if ($sellerProfitInVen > 0) {
-                $this->venRepository->sendVen(
-                    $sellOrder->getUserId(),
-                    self::SYSTEM_USER_ID,
-                    $sellerProfitInVen,
-                    sprintf(
-                        'Profit made from an order placed in the exchange. buy order: %d, sell order: %d',
-                        $buyOrder->getId(),
-                        $sellOrder->getId()
-                    ),
-                    true
-                );
-                $this->logger->debug(
-                    "Transferred '{$sellerProfitInVen} Ven' to the HubCulture system account as a profit.", [__CLASS__]
-                );
+                try {
+                    $this->venRepository->sendVen(
+                        $sellOrder->getUserId(),
+                        self::SYSTEM_USER_ID,
+                        $sellerProfitInVen,
+                        sprintf(
+                            'Profit made from an order placed in the exchange. buy order: %d, sell order: %d',
+                            $buyOrder->getId(),
+                            $sellOrder->getId()
+                        ),
+                        true
+                    );
+                    $this->logger->debug(
+                        "Transferred '{$sellerProfitInVen} Ven' to the HubCulture system account as a profit.", [__CLASS__]
+                    );
+                } catch (\Exception $e) {
+                    $this->logger->error(sprintf('Exchange fee of %s Ven for sell order [%d] not collected: %s', $sellerProfitInVen, $sellOrder->getId(), $e->getMessage()), [__CLASS__]);
+                }
             }
         }
     }

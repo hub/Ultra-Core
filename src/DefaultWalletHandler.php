@@ -89,8 +89,11 @@ class DefaultWalletHandler implements WalletHandler
      */
     public function purchase($userId, UltraAsset $asset, $purchaseAssetAmount, $customVenAmountForOneAsset = 0.0)
     {
-        if (floatval($purchaseAssetAmount) <= 0.0) {
+        if (!self::isPositiveAmount($purchaseAssetAmount)) {
             throw new WalletException("Purchase amount must be greater than zero(0)");
+        }
+        if (!is_finite((float)$customVenAmountForOneAsset) || (float)$customVenAmountForOneAsset < 0) {
+            throw new WalletException("The price must be zero (market) or greater");
         }
 
         $venWallet = $this->venRepository->getVenWalletOfUser($userId);
@@ -150,8 +153,11 @@ class DefaultWalletHandler implements WalletHandler
      */
     public function sell($userId, UltraAsset $asset, $sellAssetAmount, $customVenAmountForOneAsset = 0.0)
     {
-        if (floatval($sellAssetAmount) <= 0.0) {
-            throw new WalletException("Purchase amount must be greater than zero(0)");
+        if (!self::isPositiveAmount($sellAssetAmount)) {
+            throw new WalletException("Sell amount must be greater than zero(0)");
+        }
+        if (!is_finite((float)$customVenAmountForOneAsset) || (float)$customVenAmountForOneAsset < 0) {
+            throw new WalletException("The price must be zero (market) or greater");
         }
 
         $wallet = $this->walletRepository->getUserWallet($userId, $asset->id());
@@ -195,6 +201,13 @@ class DefaultWalletHandler implements WalletHandler
      */
     public function gift(Wallet $senderWallet, $receiverId, $purchaseAssetAmount, $message = '')
     {
+        // A negative amount would credit the sender and debit the receiver.
+        if (!self::isPositiveAmount($purchaseAssetAmount)) {
+            throw new InsufficientBalanceException('A transfer amount must be greater than zero(0)');
+        }
+        if ((int)$receiverId <= 0 || (int)$receiverId === (int)$senderWallet->getUserId()) {
+            throw new InsufficientBalanceException('A transfer needs another member to receive it');
+        }
         $asset = $this->ultraAssetsRepository->getAssetById($senderWallet->getAssetId());
         $receiverWallet = $this->walletRepository->getUserWallet($receiverId, $senderWallet->getAssetId());
 
@@ -225,11 +238,29 @@ class DefaultWalletHandler implements WalletHandler
         $metaData['transfer_message'] = $message;
         $metaData['commit'] = true;
 
-        $metaData['transfer_related_user'] = $senderWallet->getUserId();
-        $this->walletRepository->credit($receiverWallet, $purchaseAssetAmount, $metaData);
-
+        // take it from the sender first: the debit checks the balance under a row lock and throws if it's short
         $metaData['transfer_related_user'] = $receiverId;
         $this->walletRepository->debit($senderWallet, $purchaseAssetAmount, $metaData);
+
+        $metaData['transfer_related_user'] = $senderWallet->getUserId();
+        try {
+            $this->walletRepository->credit($receiverWallet, $purchaseAssetAmount, $metaData);
+        } catch (\Exception $e) {
+            $metaData['transfer_related_user'] = $receiverId;
+            $metaData['transfer_message'] = 'Reversal: the transfer could not be credited';
+            $this->walletRepository->credit($senderWallet, $purchaseAssetAmount, $metaData);
+            throw $e;
+        }
+    }
+
+    /**
+     * @param mixed $amount
+     *
+     * @return bool
+     */
+    private static function isPositiveAmount($amount)
+    {
+        return is_numeric($amount) && is_finite((float)$amount) && (float)$amount > 0;
     }
 
     /**

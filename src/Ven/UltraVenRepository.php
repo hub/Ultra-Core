@@ -6,6 +6,7 @@
 
 namespace Hub\UltraCore\Ven;
 
+use InvalidArgumentException;
 use mysqli;
 use RuntimeException;
 
@@ -64,9 +65,28 @@ class UltraVenRepository
      */
     public function sendVen($fromUserId, $toUserId, $amount, $message = '', $hide = false, $special = '', $type = '')
     {
-        $balance = $this->getVenWalletOfUser($fromUserId);
-        if (($balance->getBalance() - $amount) < 0) {
-            throw new RuntimeException("Insufficient VEN balance of {$balance->getBalance()}. Please topup to continue.");
+        // A negative amount pulls Ven from the receiver (OAI 941479961, Jan 2026): only positive amounts move.
+        $amount = round((float)$amount, 4);
+        if (!is_finite($amount) || $amount <= 0) {
+            throw new InvalidArgumentException(sprintf('A Ven amount must be greater than zero(0), got %s', var_export($amount, true)));
+        }
+        $fromUserId = (int)$fromUserId;
+        $toUserId = (int)$toUserId;
+        if ($fromUserId === $toUserId) {
+            throw new InvalidArgumentException('Ven cannot be sent to the same account.');
+        }
+        if (is_null($this->getVenWalletOfUser($toUserId))) {
+            throw new RuntimeException("Cannot find the Ven account of the receiver {$toUserId}.");
+        }
+
+        // venbalance is MyISAM: no transaction to roll back, but one UPDATE is atomic. Take the Ven only if it is
+        // there, write the receipt, then credit; undo the debit if the receipt can't be written.
+        if (!$this->debitVenWallet($fromUserId, $amount)) {
+            $balance = $this->getVenWalletOfUser($fromUserId);
+            throw new RuntimeException(sprintf(
+                "Insufficient VEN balance of %s. Please topup to continue.",
+                $balance ? $balance->getBalance() : 0
+            ));
         }
 
         $preparedStmt = $this->dbConnection->prepare(<<<SQL
@@ -77,23 +97,16 @@ SQL
 
         $now = time();
         $hide = intval($hide);
-        $preparedStmt->bind_param('iidisiss', $fromUserId, $toUserId, $amount, $now, $message, $hide, $special, $type);
-        $created = $preparedStmt->execute();
-        if ($created) {
-            // deduct/debit ven from the sender
-            $this->debitVenWallet($fromUserId, $amount);
-
-            // add/credit ven to the receiver
-            $this->creditVenWallet($toUserId, $amount);
+        $created = $preparedStmt && $preparedStmt->bind_param('iidisiss', $fromUserId, $toUserId, $amount, $now, $message, $hide, $special, $type)
+            && $preparedStmt->execute();
+        if (!$created) {
+            $this->creditVenWallet($fromUserId, $amount);
+            throw new RuntimeException('Cannot record the Ven transaction: ' . $this->dbConnection->error);
         }
+
+        $this->creditVenWallet($toUserId, $amount);
     }
 
-    /**
-     * @param int   $userId Hub Culture user identifier.
-     * @param float $amount
-     *
-     * @return bool
-     */
     private function creditVenWallet($userId, $amount)
     {
         $preparedStmt = $this->dbConnection->prepare('UPDATE `venbalance` SET `balance` = `balance` + ? WHERE `user` = ?');
@@ -107,10 +120,13 @@ SQL
      *
      * @return bool
      */
+    /**
+     * @return bool true only when the account had the Ven and it was taken
+     */
     private function debitVenWallet($userId, $amount)
     {
-        $preparedStmt = $this->dbConnection->prepare('UPDATE `venbalance` SET `balance` = `balance` - ? WHERE `user` = ?');
-        $preparedStmt->bind_param('di', $amount, $userId);
-        return $preparedStmt->execute();
+        $preparedStmt = $this->dbConnection->prepare('UPDATE `venbalance` SET `balance` = `balance` - ? WHERE `user` = ? AND `balance` >= ?');
+        $preparedStmt->bind_param('did', $amount, $userId, $amount);
+        return $preparedStmt->execute() && $preparedStmt->affected_rows === 1;
     }
 }
