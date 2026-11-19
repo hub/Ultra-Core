@@ -23,17 +23,32 @@ class MatchedOrderPair
     private $settledAmount;
 
     /**
+     * @var int|null
+     */
+    private $settlementId;
+
+    /**
      * MatchedOrderPair constructor.
      *
      * @param BuyOrder  $buyOrder      The matched buy order
      * @param SellOrder $sellOrder     The matched sell order
      * @param float     $settledAmount Amount of assets settled for this matched pair
+     * @param int|null  $settlementId  ultra_custom_buy_sell_order_settlements.id: the pair's settlement key
      */
-    public function __construct(BuyOrder $buyOrder, SellOrder $sellOrder, $settledAmount)
+    public function __construct(BuyOrder $buyOrder, SellOrder $sellOrder, $settledAmount, $settlementId = null)
     {
         $this->buyOrder = $buyOrder;
         $this->sellOrder = $sellOrder;
         $this->settledAmount = floatval($settledAmount);
+        $this->settlementId = $settlementId === null ? null : (int)$settlementId;
+    }
+
+    /**
+     * @return int|null ultra_custom_buy_sell_order_settlements.id, when the pair was read from it
+     */
+    public function getSettlementId()
+    {
+        return $this->settlementId;
     }
 
     /**

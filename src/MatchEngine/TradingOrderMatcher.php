@@ -5,6 +5,7 @@
 
 namespace Hub\UltraCore\MatchEngine;
 
+use Hub\UltraCore\MatchEngine\Order\AbstractOrder;
 use Hub\UltraCore\MatchEngine\Order\BuyOrder;
 use Hub\UltraCore\MatchEngine\Order\OrderRepository;
 use Hub\UltraCore\MatchEngine\Order\Orders;
@@ -52,16 +53,7 @@ class TradingOrderMatcher
             $previousSettledSoFar = $sellOrder->getSettledAmountSoFar();
             $matchedOrder = $this->findBuyOrderForOfferingRate($buyOrders, $sellOrder);
             if (!is_null($matchedOrder)) {
-                if ($matchedOrder->getAmount() === $matchedOrder->getSettledAmountSoFar()) {
-                    $matchedOrder->setStatus(Orders::STATUS_PROCESSED);
-                    $this->orderRepository->processOrder($matchedOrder->getId());
-                }
-
-                $this->orderRepository->addSettlement(
-                    $sellOrder->getId(),
-                    $matchedOrder->getId(),
-                    $sellOrder->getSettledAmountSoFar() - $previousSettledSoFar
-                );
+                $this->recordMatch($sellOrder, $matchedOrder, $previousSettledSoFar);
             }
             // let's update the status to processed, if we have settled the full amount
             if ($sellOrder->getAmount() === $sellOrder->getSettledAmountSoFar()) {
@@ -76,16 +68,7 @@ class TradingOrderMatcher
             $previousSettledSoFar = $buyOrder->getSettledAmountSoFar();
             $matchedOrder = $this->findSellOrderForOfferingRate($sellOrders, $buyOrder);
             if (!is_null($matchedOrder)) {
-                if ($matchedOrder->getAmount() === $matchedOrder->getSettledAmountSoFar()) {
-                    $matchedOrder->setStatus(Orders::STATUS_PROCESSED);
-                    $this->orderRepository->processOrder($matchedOrder->getId());
-                }
-
-                $this->orderRepository->addSettlement(
-                    $buyOrder->getId(),
-                    $matchedOrder->getId(),
-                    $buyOrder->getSettledAmountSoFar() - $previousSettledSoFar
-                );
+                $this->recordMatch($buyOrder, $matchedOrder, $previousSettledSoFar);
             }
             // let's update the status to processed, if we have settled the full amount
             if ($buyOrder->getAmount() === $buyOrder->getSettledAmountSoFar()) {
@@ -95,6 +78,42 @@ class TradingOrderMatcher
         }
 
         return new Orders($buyOrders, $sellOrders);
+    }
+
+    /**
+     * Persists both orders' matched amounts first, then logs the settlement the match engine pays. If either amount
+     * can't be saved (the order changed since it was read), the match is undone in memory and nothing is logged, so
+     * no money moves for it. Before this, the matched amount lived only in memory and every run matched (and the
+     * issuer path bought) the whole order again.
+     *
+     * @param AbstractOrder $mainOrder
+     * @param AbstractOrder $matchedOrder
+     * @param float         $previousSettledSoFar the main order's matched amount before this match
+     */
+    private function recordMatch(AbstractOrder $mainOrder, AbstractOrder $matchedOrder, $previousSettledSoFar)
+    {
+        $delta = $mainOrder->getSettledAmountSoFar() - $previousSettledSoFar;
+        $matchedPrevious = $matchedOrder->getSettledAmountSoFar() - $delta;
+
+        $mainSaved = $this->orderRepository->updateSettledAmount($mainOrder->getId(), $previousSettledSoFar, $mainOrder->getSettledAmountSoFar()) === true;
+        $matchedSaved = $mainSaved
+            && $this->orderRepository->updateSettledAmount($matchedOrder->getId(), $matchedPrevious, $matchedOrder->getSettledAmountSoFar()) === true;
+        if (!$matchedSaved) {
+            if ($mainSaved) {
+                $this->orderRepository->updateSettledAmount($mainOrder->getId(), $mainOrder->getSettledAmountSoFar(), $previousSettledSoFar);
+            }
+            $mainOrder->setSettledAmountSoFar($previousSettledSoFar);
+            $matchedOrder->setSettledAmountSoFar($matchedPrevious);
+
+            return;
+        }
+
+        if ($matchedOrder->getAmount() === $matchedOrder->getSettledAmountSoFar()) {
+            $matchedOrder->setStatus(Orders::STATUS_PROCESSED);
+            $this->orderRepository->processOrder($matchedOrder->getId());
+        }
+
+        $this->orderRepository->addSettlement($mainOrder->getId(), $matchedOrder->getId(), $delta);
     }
 
     /**

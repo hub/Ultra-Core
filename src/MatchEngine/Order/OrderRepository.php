@@ -38,6 +38,14 @@ class OrderRepository
     }
 
     /**
+     * @return Connection the connection the orders live on (SettlementGuard and the run lock use it too)
+     */
+    public function getConnection()
+    {
+        return $this->database;
+    }
+
+    /**
      * Use this to add a sell order into the system. Sell orders are processed asynchronously later and settled if a
      * matching buy order found or processed by a system admin directly.
      * @see SellOrder::match()
@@ -246,15 +254,11 @@ class OrderRepository
             return;
         }
 
+        // An order claimed by a settlement (processing) or held for review belongs to SettlementGuard.
         try {
-            $this->database->update(
-                'ultra_custom_buy_sell_orders',
-                [
-                    'status' => Orders::STATUS_REJECTED,
-                    'notes' => $notes,
-                ],
-                ['id' => $orderId],
-                ['status' => ParameterType::STRING, 'notes' => ParameterType::STRING]
+            $this->database->executeStatement(
+                'UPDATE `ultra_custom_buy_sell_orders` SET `status` = ?, `notes` = ? WHERE `id` = ? AND `status` NOT IN (?, ?)',
+                [Orders::STATUS_REJECTED, (string)$notes, (int)$orderId, Orders::STATUS_PROCESSING, Orders::STATUS_REVIEW]
             );
             $this->logger->info(sprintf("Marked the order [%d] as 'rejected'", $orderId), [__CLASS__]);
         } catch (DBALException $e) {
@@ -279,15 +283,11 @@ class OrderRepository
             return;
         }
 
+        // An order claimed by a settlement (processing) or held for review belongs to SettlementGuard.
         try {
-            $this->database->update(
-                'ultra_custom_buy_sell_orders',
-                [
-                    'status' => Orders::STATUS_PROCESSED,
-                    'notes' => $notes,
-                ],
-                ['id' => $orderId],
-                ['status' => ParameterType::STRING, 'notes' => ParameterType::STRING]
+            $this->database->executeStatement(
+                'UPDATE `ultra_custom_buy_sell_orders` SET `status` = ?, `notes` = ? WHERE `id` = ? AND `status` NOT IN (?, ?)',
+                [Orders::STATUS_PROCESSED, (string)$notes, (int)$orderId, Orders::STATUS_PROCESSING, Orders::STATUS_REVIEW]
             );
             $this->logger->info(sprintf("Marked the order [%d] as 'processed'", $orderId), [__CLASS__]);
         } catch (DBALException $e) {
@@ -297,6 +297,33 @@ class OrderRepository
                 $e->getMessage()
             ));
         }
+    }
+
+    /**
+     * Persists how much of an order the order book has matched, only if nobody changed it since it was read.
+     * Until this existed the amount lived only in memory, so the next run matched (and the issuer path bought)
+     * the whole order again.
+     *
+     * @param int   $orderId
+     * @param float $previous the value read at the start of the run
+     * @param float $new
+     *
+     * @return bool true when exactly one row changed
+     */
+    public function updateSettledAmount($orderId, $previous, $new)
+    {
+        try {
+            $rows = $this->database->executeStatement(
+                'UPDATE `ultra_custom_buy_sell_orders` SET `settled_amount_so_far` = ? WHERE `id` = ? AND `settled_amount_so_far` = ? AND `status` IN (?, ?)',
+                [sprintf('%.4F', $new), (int)$orderId, sprintf('%.4F', $previous), Orders::STATUS_PENDING, Orders::STATUS_PROCESSED]
+            );
+        } catch (DBALException $e) {
+            $this->logger->error(sprintf('Error occurred when updating the settled amount of order [%d]. Error : %s', $orderId, $e->getMessage()));
+
+            return false;
+        }
+
+        return (int)$rows === 1;
     }
 
     /**
@@ -363,6 +390,7 @@ class OrderRepository
             $lastSettlementId = (int)$lastSettlementId;
             $resultSet = $this->database->executeQuery(<<<SQL
 SELECT
+    s.id AS `settlement_id`,
     o.id AS `main_order_id`,
     o.user_id AS `main_order_user_id`,
     o.asset_id AS `main_order_asset_id`,
@@ -386,6 +414,7 @@ FROM `ultra_custom_buy_sell_order_settlements` s
 INNER JOIN ultra_custom_buy_sell_orders o ON (o.id = s.order_id)
 INNER JOIN ultra_custom_buy_sell_orders o2 ON (o2.id = s.matched_order_id)
 WHERE s.id > {$lastSettlementId}
+ORDER BY s.id ASC
 SQL
             );
         } catch (DBALException $e) {
@@ -447,7 +476,7 @@ SQL
             }
 
             if (!is_null($buyOrder) && !is_null($sellOrder)) {
-                $settleOrderPairs[] = new MatchedOrderPair($buyOrder, $sellOrder, $row['settled_amount']);
+                $settleOrderPairs[] = new MatchedOrderPair($buyOrder, $sellOrder, $row['settled_amount'], $row['settlement_id']);
             }
         }
 

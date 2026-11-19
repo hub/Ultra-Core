@@ -10,6 +10,10 @@ class Orders
     const STATUS_PENDING = 'pending';
     const STATUS_REJECTED = 'rejected';
     const STATUS_PROCESSED = 'processed';
+    /** Claimed by a match engine run that is moving money for it (SettlementGuard). */
+    const STATUS_PROCESSING = 'processing';
+    /** The money's state is uncertain: kept out of every automatic path until a human sets it. */
+    const STATUS_REVIEW = 'review';
     const TYPE_SELL = 'sell';
     const TYPE_PURCHASE = 'buy';
 
