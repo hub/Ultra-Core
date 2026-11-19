@@ -19,6 +19,11 @@ class UltraAsset
     /** @var string */
     private $title;
 
+    /**
+     * @var string
+     */
+    private $category;
+
     /** @var string */
     private $description;
 

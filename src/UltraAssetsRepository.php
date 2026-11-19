@@ -123,12 +123,46 @@ class UltraAssetsRepository
     /**
      * @param int   $assetId
      * @param float $quantity
+     *
+     * @return bool true when exactly one asset row changed
      */
     public function deductTotalAssetQuantityBy($assetId, $quantity)
     {
         $quantity = (float)$quantity;
         $assetId = (int)$assetId;
-        $this->dbConnection->query("UPDATE ultra_assets SET num_assets = num_assets - {$quantity} WHERE id = {$assetId}");
+        try {
+            $done = $this->dbConnection->query("UPDATE ultra_assets SET num_assets = num_assets - {$quantity} WHERE id = {$assetId}");
+        } catch (Exception $e) {
+            return false;
+        }
+
+        return $done !== false && $this->dbConnection->affected_rows === 1;
+    }
+
+    /**
+     * Whether an asset is an Emerald City bond (hub/HubID#329): a row in `ultra_bond_terms`.
+     *
+     * @param int $assetId
+     *
+     * @return bool|null null when it can't be told (a database error other than the table not existing)
+     */
+    public function hasBondTerms($assetId)
+    {
+        $assetId = (int)$assetId;
+        try {
+            $result = $this->dbConnection->query("SELECT COUNT(*) FROM `ultra_bond_terms` WHERE `asset_id` = {$assetId}");
+            $errno = $result === false ? (int)$this->dbConnection->errno : 0;
+        } catch (Exception $e) {
+            $result = false;
+            $errno = (int)$e->getCode();
+        }
+        if ($result === false) {
+            return $errno === 1146 ? false : null; // 1146: no such table, so no bonds on this database
+        }
+        $row = $result->fetch_row();
+        $result->free();
+
+        return $row ? ((int)$row[0] > 0) : null;
     }
 
     /**
@@ -137,20 +171,28 @@ class UltraAssetsRepository
      * @param int   $authorityIssuerId Hub authority issuer user id.
      * @param int   $assetId           Ultra asset unique identifier.
      * @param float $quantity
+     *
+     * @return bool true when the statement changed at least one issuance row
      */
     public function deductAssetQuantityBy($authorityIssuerId, $assetId, $quantity)
     {
         $authorityIssuerId = (int)$authorityIssuerId;
         $assetId = (int)$assetId;
         $quantity = (float)$quantity;
-        $this->dbConnection->query(<<<SQL
+        try {
+            $done = $this->dbConnection->query(<<<SQL
 UPDATE `ultra_asset_issuance_history`
     SET `remaining_asset_quantity` = `remaining_asset_quantity` - {$quantity}
 WHERE
     `user_id` = {$authorityIssuerId}
     AND `asset_id` = {$assetId}
 SQL
-        );
+            );
+        } catch (Exception $e) {
+            return false;
+        }
+
+        return $done !== false && $this->dbConnection->affected_rows >= 1;
     }
 
     /**

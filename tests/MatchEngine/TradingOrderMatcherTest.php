@@ -33,6 +33,8 @@ final class TradingOrderMatcherTest extends TestCase
         /** @var PHPUnit_Framework_MockObject_MockObject|OrderRepository $ordersProviderMock */
         $ordersProviderMock = $this->getMockBuilder(OrderRepository::class)->disableOriginalConstructor()->getMock();
         $ordersProviderMock->method('getPendingOrders')->willReturn($actualUserPlacesOrders);
+        // matched amounts are persisted before a settlement is logged
+        $ordersProviderMock->method('updateSettledAmount')->willReturn(true);
 //        $ordersProviderMock->method('getSettlementsLoggedAfterId')->willReturn([]);
 
         $sut = new TradingOrderMatcher($ordersProviderMock, $walletRepositoryMock);
